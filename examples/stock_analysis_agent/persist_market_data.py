@@ -64,9 +64,14 @@ def main() -> None:
             print(json.dumps({"status": "invalid", "problems": [str(exc)]}, ensure_ascii=False))
             return
 
-        item["amplitude_pct"] = round(
-            (item["high"] - item["low"]) / item["close"] * 100.0, 4
-        ) if item["close"] else None
+        # A-share amplitude is measured against the previous close.
+        # The first fallback row has no prior close in the collected window, so
+        # leave it unknown instead of using the current close as a denominator.
+        item["amplitude_pct"] = (
+            round((item["high"] - item["low"]) / previous_close * 100.0, 4)
+            if previous_close
+            else None
+        )
 
         if previous_close:
             item["change_value"] = round(item["close"] - previous_close, 4)
