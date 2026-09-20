@@ -33,7 +33,7 @@ def test_suspend_then_same_command_resume(tmp_path: Path):
     state_dir = tmp_path / "state"
     side_effect = tmp_path / "counter.txt"
     script.write_text(
-        f'''
+        f"""
 from dataclasses import dataclass
 from pathlib import Path
 from looma import workflow, step, agent
@@ -55,7 +55,7 @@ def main():
     print("FINAL", d.choice, x["n"])
 
 main()
-''',
+""",
         encoding="utf-8",
     )
 
@@ -82,7 +82,7 @@ def test_two_agent_calls_across_restarts(tmp_path: Path):
     script = tmp_path / "loop.py"
     state_dir = tmp_path / "state"
     script.write_text(
-        '''
+        """
 from looma import workflow, agent
 
 @workflow
@@ -94,7 +94,7 @@ def main():
     print("DONE", values)
 
 main()
-''',
+""",
         encoding="utf-8",
     )
 
@@ -128,9 +128,10 @@ def test_fixed_prompt_is_exact():
 def test_skill_is_packaged():
     from importlib.resources import files
 
-    skill = files("looma").joinpath("skills", "llm-driven-programmatic-coding", "SKILL.md")
+    skill = files("looma").joinpath("skills", "agent-embedded-programming", "SKILL.md")
     assert skill.is_file()
     text = skill.read_text(encoding="utf-8")
-    assert "same-command replay/resume" in text
+    assert "Agent-Embedded Programming" in text
     assert "script2agent" in text
     assert "agent2script" in text
+    assert "same-command replay/resume" in text
