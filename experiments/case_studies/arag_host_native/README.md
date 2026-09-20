@@ -60,3 +60,20 @@ The deterministic `smoke_driver.py` is only an integration test. It simulates a
 Host response so CI can prove that A-RAG retrieval state, Looma suspension,
 Result Contract validation, Resume Contract validation, and replay work
 together. It does not measure Host-Agent intelligence or answer quality.
+
+## Batch benchmark workflow
+
+For the paper-quality multi-hop evaluation, use:
+
+```bash
+python -m experiments.case_studies.arag_host_native.batch_workflow \
+  --questions /path/to/data/musique/questions.json \
+  --config /path/to/arag/configs/test_musique.yaml \
+  --output results/aep-musique/predictions.jsonl \
+  --sessions-dir results/aep-musique/sessions \
+  --limit 100
+```
+
+The output intentionally follows A-RAG's prediction field conventions so the
+original `scripts/eval.py` can evaluate the Host-native result. See
+`research/ARAG_CASE_PROTOCOL.md` for the controlled comparison protocol.
