@@ -60,7 +60,7 @@ def _resume(
     return completed, request
 
 
-def _market_fixture(path: Path) -> None:
+def _market_research_result() -> dict:
     rows = []
     closes = [210, 214, 212, 218, 225, 231, 228, 236, 244, 252]
     volumes = [120, 130, 125, 145, 170, 210, 180, 260, 320, 350]
@@ -76,21 +76,24 @@ def _market_fixture(path: Path) -> None:
                 "low": close - 5,
                 "volume": volume,
                 "turnover_value": volume * close * 1000,
-                "amplitude_pct": 4.0 + (index % 3),
-                "change_pct": 2.0 + (index % 4),
-                "change_value": 4.0,
                 "turnover_rate_pct": turnover,
             }
         )
 
-    path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
+    return {
+        "coverage_complete": True,
+        "source_urls": [
+            "https://example.test/market-source-a",
+            "https://example.test/market-source-b",
+        ],
+        "source_note": "CI simulates a host that has cross-checked real-source-shaped market rows.",
+        "rows": rows,
+    }
 
 
-def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
+def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
     workdir = tmp_path / "work"
     state_dir = tmp_path / "state"
-    fixture = tmp_path / "market.json"
-    _market_fixture(fixture)
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC)
@@ -113,22 +116,48 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
         "10",
         "--max-research-rounds",
         "2",
-        "--market-fixture",
-        str(fixture),
+        "--force-market-fallback",
     ]
 
-    # Stage 1-3 run as scripts, then the host is asked to research recent news.
+    # AKShare failure is represented as a normal step result; Looma then yields
+    # a host-native task asking for sourced REAL market data.
     first = _run(command, cwd=tmp_path, env=env)
     assert first.returncode == 75, first.stderr
-    assert (workdir / "market-data.json").exists()
-    assert (workdir / "market-features.json").exists()
 
     run_dir = next((state_dir / "runs").iterdir())
     request1_file = _latest_request(run_dir)
     request1 = json.loads(request1_file.read_text(encoding="utf-8"))
-    assert "上网查询" in request1["task"]
-    assert "2026-09-18" in request1["task"]
-    assert "2026-09-20" in request1["task"]
+    assert "AKShare 未能取得" in request1["task"]
+    assert "禁止编造" in request1["task"]
+    assert "web/search/browser" in request1["task"]
+    assert "Coding Agent" in request1["task"]
+    assert not (workdir / "market-data.json").exists()
+
+    second, _ = _resume(
+        request_file=request1_file,
+        response_file=tmp_path / "agent2script-1.json",
+        result=_market_research_result(),
+        cwd=tmp_path,
+        env=env,
+    )
+
+    # Host market data is validated/persisted and features are computed before
+    # the next Agent boundary asks the same current host for recent news.
+    assert second.returncode == 75, second.stderr
+    assert (workdir / "market-data.json").exists()
+    assert (workdir / "market-features.json").exists()
+
+    market = json.loads((workdir / "market-data.json").read_text(encoding="utf-8"))
+    assert market["source"] == "host-web-research"
+    assert len(market["source_urls"]) == 2
+    assert len(market["rows"]) == 10
+
+    request2_file = _latest_request(run_dir)
+    request2 = json.loads(request2_file.read_text(encoding="utf-8"))
+    assert request2_file != request1_file
+    assert "上网查询" in request2["task"]
+    assert "2026-09-18" in request2["task"]
+    assert "2026-09-20" in request2["task"]
 
     news_result = {
         "window_start": "2026-09-18",
@@ -157,24 +186,23 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
         "coverage_note": "测试中模拟完成多来源近期新闻检索。",
     }
 
-    second, _ = _resume(
-        request_file=request1_file,
-        response_file=tmp_path / "agent2script-1.json",
+    third, _ = _resume(
+        request_file=request2_file,
+        response_file=tmp_path / "agent2script-2.json",
         result=news_result,
         cwd=tmp_path,
         env=env,
     )
 
-    # Evidence validation passes, then the host receives the four-track analysis task.
-    assert second.returncode == 75, second.stderr
-    request2_file = _latest_request(run_dir)
-    assert request2_file != request1_file
-    request2 = json.loads(request2_file.read_text(encoding="utf-8"))
-    assert "native subagent" in request2["task"]
-    assert "并发执行" in request2["task"]
-    assert "technical/K-line" in request2["task"]
-    assert "volume/turnover" in request2["task"]
-    assert "risk/counter-evidence" in request2["task"]
+    # Evidence gate passes, then the host receives the four-track analysis task.
+    assert third.returncode == 75, third.stderr
+    request3_file = _latest_request(run_dir)
+    request3 = json.loads(request3_file.read_text(encoding="utf-8"))
+    assert "native subagent" in request3["task"]
+    assert "并发执行" in request3["task"]
+    assert "technical/K-line" in request3["task"]
+    assert "volume/turnover" in request3["task"]
+    assert "risk/counter-evidence" in request3["task"]
 
     analysis1 = {
         "needs_more_research": True,
@@ -185,6 +213,11 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
             "news/event",
             "risk/counter-evidence",
         ],
+        "market_evidence": [
+            "2026-09-17 close=244 volume=320 turnover_rate=8.4%",
+            "2026-09-18 close=252 volume=350 turnover_rate=9.1%",
+        ],
+        "news_evidence_urls": ["https://example.test/news-b"],
         "technical_view": "价格处于短期上行区间，但样本较短。",
         "volume_turnover_view": "成交量和换手率同步抬升，需要确认事件驱动。",
         "news_event_view": "近期消息可能与放量有关，但证据还不充分。",
@@ -195,20 +228,20 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
         "watch_signals": ["后续成交量是否持续", "事件是否有一手公告确认"],
     }
 
-    third, _ = _resume(
-        request_file=request2_file,
-        response_file=tmp_path / "agent2script-2.json",
+    fourth, _ = _resume(
+        request_file=request3_file,
+        response_file=tmp_path / "agent2script-3.json",
         result=analysis1,
         cwd=tmp_path,
         env=env,
     )
 
-    # The Python analysis loop asks the host for targeted research.
-    assert third.returncode == 75, third.stderr
-    request3_file = _latest_request(run_dir)
-    request3 = json.loads(request3_file.read_text(encoding="utf-8"))
-    assert request3_file not in {request1_file, request2_file}
-    assert "定向事实核查" in request3["task"]
+    # The deterministic analysis validator passes the structure, but because the
+    # host asked for more evidence, Python schedules a targeted research boundary.
+    assert fourth.returncode == 75, fourth.stderr
+    request4_file = _latest_request(run_dir)
+    request4 = json.loads(request4_file.read_text(encoding="utf-8"))
+    assert "定向事实核查" in request4["task"]
 
     supplement = {
         "window_start": "2026-09-18",
@@ -229,20 +262,19 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
         "coverage_note": "完成定向事实核查。",
     }
 
-    fourth, _ = _resume(
-        request_file=request3_file,
-        response_file=tmp_path / "agent2script-3.json",
+    fifth, _ = _resume(
+        request_file=request4_file,
+        response_file=tmp_path / "agent2script-4.json",
         result=supplement,
         cwd=tmp_path,
         env=env,
     )
 
-    # The analysis loop runs again with the expanded evidence set.
-    assert fourth.returncode == 75, fourth.stderr
-    request4_file = _latest_request(run_dir)
-    request4 = json.loads(request4_file.read_text(encoding="utf-8"))
-    assert request4_file not in {request1_file, request2_file, request3_file}
-    assert "technical/K-line" in request4["task"]
+    # The workflow replays and asks for a second constrained analysis.
+    assert fifth.returncode == 75, fifth.stderr
+    request5_file = _latest_request(run_dir)
+    request5 = json.loads(request5_file.read_text(encoding="utf-8"))
+    assert "technical/K-line" in request5["task"]
 
     analysis2 = {
         "needs_more_research": False,
@@ -252,6 +284,14 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
             "volume/turnover",
             "news/event",
             "risk/counter-evidence",
+        ],
+        "market_evidence": [
+            "2026-09-14~2026-09-18 close increased from 231 to 252",
+            "2026-09-18 volume=350 and turnover_rate=9.1%",
+        ],
+        "news_evidence_urls": [
+            "https://example.test/news-b",
+            "https://example.test/company-c",
         ],
         "technical_view": "近期收盘价上行，且最新价格位于短期均线上方。",
         "volume_turnover_view": "近5日成交量与换手率较前5日明显抬升，量价同步偏强。",
@@ -264,8 +304,8 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
     }
 
     final, _ = _resume(
-        request_file=request4_file,
-        response_file=tmp_path / "agent2script-4.json",
+        request_file=request5_file,
+        response_file=tmp_path / "agent2script-5.json",
         result=analysis2,
         cwd=tmp_path,
         env=env,
@@ -278,6 +318,7 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
     assert report_md.exists()
 
     report = json.loads(report_json.read_text(encoding="utf-8"))
+    assert report["status"] == "complete"
     assert report["target"]["name"] == "宇树科技"
     assert report["target"]["symbol"] == "688836"
     assert report["market_features"]["sample"]["trading_days"] == 10
@@ -286,18 +327,25 @@ def test_stock_analysis_agent_end_to_end_with_research_loop(tmp_path: Path):
     assert len(report["recent_news"]["items"]) == 3
     assert report["analysis"]["short_term_bias"] == "bullish"
     assert report["analysis"]["confidence"] == 72
+    assert report["analysis"]["market_evidence"]
+    assert report["analysis"]["news_evidence_urls"]
 
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "completed"
     kinds = [event["kind"] for event in state["events"]]
     assert kinds == [
-        "step",
-        "step",
-        "step",
-        "agent",
-        "step",
-        "agent",
-        "agent",
-        "agent",
-        "step",
+        "step",   # resolve_stock
+        "step",   # AKShare attempt -> recoverable fallback
+        "agent",  # host real market-data research
+        "step",   # validate/persist host market data
+        "step",   # market features
+        "agent",  # recent news
+        "step",   # news evidence gate
+        "agent",  # first four-track analysis
+        "step",   # analysis validation
+        "agent",  # targeted research
+        "agent",  # second four-track analysis
+        "step",   # final analysis validation
+        "step",   # final news evidence re-check
+        "step",   # render report
     ]
