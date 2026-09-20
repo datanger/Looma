@@ -9,6 +9,7 @@ from pathlib import Path
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--status", choices=["complete", "insufficient_evidence"], required=True)
     parser.add_argument("--target-json", required=True)
     parser.add_argument("--features-json", required=True)
     parser.add_argument("--news-json", required=True)
@@ -25,6 +26,7 @@ def main() -> None:
     workdir.mkdir(parents=True, exist_ok=True)
 
     payload = {
+        "status": args.status,
         "target": target,
         "market_features": features,
         "recent_news": news,
@@ -38,6 +40,7 @@ def main() -> None:
     lines = [
         f"# {target['name']} ({target['symbol']}) 短期股票分析",
         "",
+        f"- 状态：{args.status}",
         f"- 分析时点：{target['as_of']}",
         f"- 新闻窗口：{target['news_start']} ~ {target['news_end']}",
         f"- 行情样本：{features['sample']['first_date']} ~ {features['sample']['last_date']}，{features['sample']['trading_days']} 个交易日",
@@ -74,11 +77,17 @@ def main() -> None:
             "",
             f"**置信度：{analysis['confidence']}/100**",
             "",
+            "### 使用的行情证据",
+            *[f"- {item}" for item in analysis.get("market_evidence", [])],
+            "",
             f"### K线 / 趋势\n{analysis['technical_view']}",
             "",
             f"### 成交量 / 换手率\n{analysis['volume_turnover_view']}",
             "",
             f"### 新闻 / 事件\n{analysis['news_event_view']}",
+            "",
+            "### 使用的新闻证据 URL",
+            *[f"- {item}" for item in analysis.get("news_evidence_urls", [])],
             "",
             f"### 风险与反向证据\n{analysis['risk_counterevidence']}",
             "",
@@ -102,6 +111,7 @@ def main() -> None:
     print(
         json.dumps(
             {
+                "status": args.status,
                 "report_json": str(json_file),
                 "report_markdown": str(markdown_file),
                 "short_term_bias": analysis["short_term_bias"],
