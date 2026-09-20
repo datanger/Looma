@@ -90,3 +90,30 @@ main()
     for run_dir in run_dirs:
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         assert state["status"] == "failed"
+
+
+def test_user_system_exit_finalizes_run_and_releases_pointer(tmp_path: Path):
+    script = tmp_path / "exit.py"
+    state_dir = tmp_path / "state"
+    script.write_text(
+        """
+import sys
+from looma import workflow
+
+@workflow
+def main():
+    sys.exit(3)
+
+main()
+""",
+        encoding="utf-8",
+    )
+
+    result = _run(script, tmp_path, state_dir, "system-exit")
+    assert result.returncode == 3
+    assert list((state_dir / "invocations").glob("*.json")) == []
+
+    run_dir = next((state_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert state["status"] == "failed"
+    assert "SystemExit" in state["error"]
