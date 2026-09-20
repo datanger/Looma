@@ -60,7 +60,7 @@ def prepare_case(root: Path) -> tuple[Path, Path, Path, dict[str, str], dict]:
     state_dir = root / "state"
     sentinel = root / "done.txt"
     script = root / "workflow.py"
-    script.write_text(WORKFLOW.format(sentinel=str(sentinel)), encoding="utf-8")
+    script.write_text(WORKFLOW.replace("{sentinel!r}", repr(str(sentinel))), encoding="utf-8")
     env = looma_env(state_dir)
 
     first = run_python([script], cwd=root, env=env)
