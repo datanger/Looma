@@ -1,4 +1,4 @@
-"""Fetch recent A-share daily market data with AKShare."""
+"""Try AKShare first; return a host-fallback request instead of inventing market data."""
 
 from __future__ import annotations
 
@@ -60,6 +60,43 @@ def load_fixture(path: Path) -> list[dict[str, Any]]:
     return value
 
 
+def ready_payload(*, symbol: str, rows: list[dict[str, Any]], source: str, output: Path) -> dict:
+    rows = rows
+    if not rows:
+        raise RuntimeError("market-data result is empty")
+
+    payload = {
+        "symbol": symbol,
+        "source": source,
+        "source_urls": [],
+        "adjust": "",
+        "rows": rows,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    latest = rows[-1]
+    return {
+        "status": "ready",
+        "market_file": str(output),
+        "source": source,
+        "row_count": len(rows),
+        "first_date": rows[0]["date"],
+        "last_date": latest["date"],
+        "latest": latest,
+    }
+
+
+def fallback_payload(*, symbol: str, start: str, end: str, market_days: int, error: BaseException) -> dict:
+    return {
+        "status": "needs_host_fallback",
+        "symbol": symbol,
+        "requested_start": start,
+        "requested_end": end,
+        "market_days": market_days,
+        "reason": f"{type(error).__name__}: {error}",
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--symbol", required=True)
@@ -68,19 +105,27 @@ def main() -> None:
     parser.add_argument("--market-days", type=int, required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--fixture", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--force-fallback", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
+    output = Path(args.output).resolve()
+
     if args.fixture:
-        rows = load_fixture(Path(args.fixture))
-        source = "fixture"
-    else:
-        try:
-            import akshare as ak
-        except ImportError as exc:
-            raise SystemExit(
-                "AKShare is required for live market data. "
-                "Run: pip install -r examples/stock_analysis_agent/requirements.txt"
-            ) from exc
+        rows = load_fixture(Path(args.fixture))[-args.market_days :]
+        result = ready_payload(
+            symbol=args.symbol,
+            rows=rows,
+            source="fixture-ci-only",
+            output=output,
+        )
+        print(json.dumps(result, ensure_ascii=False))
+        return
+
+    try:
+        if args.force_fallback:
+            raise ConnectionError("forced host market-data fallback for test")
+
+        import akshare as ak
 
         frame = ak.stock_zh_a_hist(
             symbol=args.symbol,
@@ -91,38 +136,27 @@ def main() -> None:
         )
         if frame is None or frame.empty:
             raise RuntimeError(f"AKShare returned no daily data for {args.symbol}")
-        rows = normalize_records(frame.to_dict(orient="records"))
-        source = "AKShare.stock_zh_a_hist"
 
-    rows = rows[-args.market_days :]
-    if not rows:
-        raise RuntimeError("market-data result is empty")
-
-    payload = {
-        "symbol": args.symbol,
-        "source": source,
-        "adjust": "",
-        "rows": rows,
-    }
-
-    output = Path(args.output).resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    latest = rows[-1]
-    print(
-        json.dumps(
-            {
-                "market_file": str(output),
-                "source": source,
-                "row_count": len(rows),
-                "first_date": rows[0]["date"],
-                "last_date": latest["date"],
-                "latest": latest,
-            },
-            ensure_ascii=False,
+        rows = normalize_records(frame.to_dict(orient="records"))[-args.market_days :]
+        result = ready_payload(
+            symbol=args.symbol,
+            rows=rows,
+            source="AKShare.stock_zh_a_hist",
+            output=output,
         )
-    )
+    except Exception as exc:
+        # Network/package/provider failure is a recoverable workflow condition.
+        # Do not synthesize prices here. The Workflow will yield a host-native
+        # web-research task that must return sourced real market data.
+        result = fallback_payload(
+            symbol=args.symbol,
+            start=args.start,
+            end=args.end,
+            market_days=args.market_days,
+            error=exc,
+        )
+
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":
