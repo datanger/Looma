@@ -652,7 +652,7 @@ return Review(...)
 V0.1 wheel 已直接发布到仓库，可无需 clone 安装：
 
 ```bash
-pip install https://raw.githubusercontent.com/datanger/Looma/main/releases/v0.1.0/looma_runtime-0.1.0-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.0/looma_runtime-0.1.0-py3-none-any.whl
 ```
 
 安装后：
