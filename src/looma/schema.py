@@ -78,7 +78,9 @@ def _validate(value: Any, schema: Any, *, path: str, root: Any, errors: list[dic
                 errors.append({"path": f"{path}.{name}", "reason": "required"})
 
         properties = schema.get("properties")
+        allowed_names: set[str] = set()
         if isinstance(properties, Mapping):
+            allowed_names = set(properties.keys())
             for name, child_schema in properties.items():
                 if name in value:
                     _validate(
@@ -89,24 +91,23 @@ def _validate(value: Any, schema: Any, *, path: str, root: Any, errors: list[dic
                         errors=errors,
                     )
 
-            additional = schema.get("additionalProperties")
-            allowed_names = set(properties.keys())
-            if additional is False:
-                for name in value:
-                    if name not in allowed_names:
-                        errors.append(
-                            {"path": f"{path}.{name}", "reason": "additional_property"}
-                        )
-            elif isinstance(additional, Mapping):
-                for name, item in value.items():
-                    if name not in allowed_names:
-                        _validate(
-                            item,
-                            additional,
-                            path=f"{path}.{name}",
-                            root=root,
-                            errors=errors,
-                        )
+        additional = schema.get("additionalProperties")
+        if additional is False:
+            for name in value:
+                if name not in allowed_names:
+                    errors.append(
+                        {"path": f"{path}.{name}", "reason": "additional_property"}
+                    )
+        elif isinstance(additional, Mapping):
+            for name, item in value.items():
+                if name not in allowed_names:
+                    _validate(
+                        item,
+                        additional,
+                        path=f"{path}.{name}",
+                        root=root,
+                        errors=errors,
+                    )
 
     if isinstance(value, list):
         items = schema.get("items")
