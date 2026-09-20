@@ -119,31 +119,40 @@ def build_script2agent(
     agent_input: Any,
     task: str,
     result_file: Path,
+    input_schema: Any,
     output_schema: Any,
     expected_script: str,
     expected_args: list[str],
 ) -> dict:
     schema = describe_schema(output_schema)
+    input_schema_description = (
+        describe_schema(input_schema) if input_schema is not None else None
+    )
     enriched_task = (
         f"{task.rstrip()}\n\n"
         "运行时交接要求：\n"
-        "1. 使用 output.agent_input 作为本次 agent 调用的输入。\n"
+        "1. 使用 output.agent_input 作为本次 agent 调用的输入；若存在 output.input_schema，"
+        "该输入已经由 Runtime 校验通过。\n"
         f"2. 将最终业务结果写入 `{result_file}`。该文件必须是 UTF-8 JSON。\n"
         "3. 结果需满足 output.output_schema。\n"
         "4. 写入结果后，不要把业务结果放进 agent2script；最终只返回 expected_output 指定的 script 和 args。\n"
         "5. agent2script 在执行前必须与 expected_output 严格校验；如不一致，不得执行该命令，应根据校验错误重新返回 expected_output。"
     )
+    output = {
+        "agent_input": agent_input,
+        "result_file": str(result_file),
+        "output_schema": schema,
+    }
+    if input_schema_description is not None:
+        output["input_schema"] = input_schema_description
+
     return {
         "script": {
             "path": source_script,
             "function": source_function,
             "class": None,
         },
-        "output": {
-            "agent_input": agent_input,
-            "result_file": str(result_file),
-            "output_schema": schema,
-        },
+        "output": output,
         "task": enriched_task,
         "prompt": FIXED_PROMPT,
         "expected_output": {

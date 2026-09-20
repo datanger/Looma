@@ -11,8 +11,9 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
 
-from .exceptions import ReplayMismatchError, WorkflowSuspend
-from .protocol import build_script2agent
+from .exceptions import AgentInputValidationError, ReplayMismatchError, WorkflowSuspend
+from .protocol import build_script2agent, describe_schema
+from .schema import validate_json_schema
 from .serde import coerce_result, dump_json, json_hash, load_json, normalize_json
 
 CURRENT_RUNTIME: ContextVar["WorkflowRuntime | None"] = ContextVar("looma_runtime", default=None)
@@ -192,11 +193,43 @@ class WorkflowRuntime:
         self.save()
         return load_json(result_file)
 
-    def agent(self, *, task: str, input: Any = None, output_schema: Any = None) -> Any:
+    def agent(
+        self,
+        *,
+        task: str,
+        input: Any = None,
+        input_schema: Any = None,
+        output_schema: Any = None,
+    ) -> Any:
         key = self._caller_key("agent")
         normalized_input = normalize_json(input)
+
+        input_schema_description = None
+        if input_schema is not None:
+            input_schema_description = describe_schema(input_schema)
+            mismatches = validate_json_schema(
+                normalized_input,
+                input_schema_description,
+            )
+            if mismatches:
+                raise AgentInputValidationError(
+                    "Agent input does not satisfy input_schema.",
+                    expected=input_schema_description,
+                    actual=normalized_input,
+                    mismatches=mismatches,
+                )
+
         schema_name = getattr(output_schema, "__qualname__", str(output_schema))
-        input_hash = json_hash({"task": task, "input": normalized_input, "schema": schema_name})
+        hash_payload = {
+            "task": task,
+            "input": normalized_input,
+            "schema": schema_name,
+        }
+        # Preserve the v0.1.4 replay fingerprint for calls that do not opt into
+        # an input contract; declared input schemas become replay-visible.
+        if input_schema_description is not None:
+            hash_payload["input_schema"] = input_schema_description
+        input_hash = json_hash(hash_payload)
         event = self._event(kind="agent", key=key, input_hash=input_hash)
         idx = self.cursor - 1
         result_file = self.events_dir / f"{idx:04d}-agent-result.json"
@@ -222,6 +255,7 @@ class WorkflowRuntime:
             agent_input=normalized_input,
             task=task,
             result_file=result_file,
+            input_schema=input_schema,
             output_schema=output_schema,
             expected_script=self.invocation.script,
             expected_args=self.invocation.args,

@@ -113,9 +113,12 @@ result = step(run_tests, repo)
 decision = agent(
     task="分析测试结果，判断是否完成；未完成则给出下一轮修复建议。",
     input=test_result,
+    input_schema={"type": "object"},
     output_schema=dict,
 )
 ```
+
+`input_schema` 是可选的输入契约；提供时，Looma 会先把 `input` 规范化为可 replay 的 JSON，再按 schema 校验。校验失败时不会进入 Agent suspend 边界。未提供时保持兼容行为，只要求输入可序列化并参与 replay hash。
 
 第一次运行到这里时 Looma 不调用模型、Agent CLI、Agent SDK 或 subagent 接口，而是生成 `script2agent`、持久化状态并暂停当前进程。
 
@@ -248,6 +251,7 @@ Looma 暂停时会：
   },
   "output": {
     "agent_input": {},
+    "input_schema": {"type": "object"},
     "result_file": "/project/.looma/runs/.../0001-agent-result.json",
     "output_schema": {"type": "object"}
   },
@@ -264,6 +268,7 @@ Looma 暂停时会：
 
 - `script`：产生本次交接的程序来源；
 - `output.agent_input`：Agent 的业务输入；
+- `output.input_schema`：可选输入契约；存在时表示 Runtime 已在 suspend 前完成结构校验；
 - `output.result_file`：Agent 结果必须写入的位置；
 - `output.output_schema`：结果约束；
 - `task`：本次具体任务；

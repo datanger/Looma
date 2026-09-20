@@ -19,6 +19,32 @@ class SerializationError(LoomaError):
     """Raised when a durable value cannot be serialized as JSON."""
 
 
+class AgentInputValidationError(LoomaError):
+    """Raised when agent() input violates its declared input_schema."""
+
+    error_code = "agent_input_validation_error"
+    action = (
+        "Fix the value passed to agent(input=...) so it satisfies input_schema. "
+        "The workflow is not suspended until input validation passes."
+    )
+
+    def __init__(self, message: str, *, expected=None, actual=None, mismatches=None):
+        super().__init__(message)
+        self.expected = expected
+        self.actual = actual
+        self.mismatches = list(mismatches or [])
+
+    def as_dict(self) -> dict:
+        return {
+            "error": self.error_code,
+            "message": str(self),
+            "input_schema": self.expected,
+            "actual_input": self.actual,
+            "mismatches": self.mismatches,
+            "action": self.action,
+        }
+
+
 class Agent2ScriptValidationError(LoomaError):
     """Raised when a handoff response violates the resume contract."""
 

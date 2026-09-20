@@ -17,6 +17,17 @@ def step(fn: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     return current_runtime().step(fn, *args, **kwargs)
 
 
-def agent(*, task: str, input: Any = None, output_schema: Any = None) -> Any:
-    """Suspend on first execution and return the persisted agent result on replay."""
-    return current_runtime().agent(task=task, input=input, output_schema=output_schema)
+def agent(
+    *,
+    task: str,
+    input: Any = None,
+    input_schema: Any = None,
+    output_schema: Any = None,
+) -> Any:
+    """Validate the boundary input, suspend, and return the validated Agent result on replay."""
+    return current_runtime().agent(
+        task=task,
+        input=input,
+        input_schema=input_schema,
+        output_schema=output_schema,
+    )

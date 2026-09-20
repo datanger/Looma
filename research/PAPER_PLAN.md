@@ -271,7 +271,7 @@ B = (T, I, O, R, A)
 
 where T is the task, I the program-provided input, O the result contract, R the resume contract, and A the deterministic acceptance criteria. The Agent may choose an internal action trajectory pi freely, but its result must satisfy O and A, and the continuation must satisfy R before the program continues.
 
-**Current-runtime precision:** Looma v0.1.4 normalizes Agent input to replay-safe JSON-compatible data and hashes it for replay consistency; it does not yet expose a user-declared `input_schema` symmetric with `output_schema`. The paper must describe this accurately. If symmetric input-schema validation becomes a paper claim, it must be implemented and evaluated first.
+**Current-main precision:** Looma now supports an optional user-declared `input_schema` on `agent()`. Inputs are normalized to replay-safe JSON, structurally validated before suspension, and hashed for replay consistency. Calls that omit `input_schema` retain the v0.1.4 replay fingerprint for backward compatibility. This input-contract feature is on `main` and must not be described as part of the published v0.1.4 wheel until a later release is cut.
 
 ### 4. Looma Runtime
 
