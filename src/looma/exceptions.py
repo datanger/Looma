@@ -20,7 +20,13 @@ class SerializationError(LoomaError):
 
 
 class Agent2ScriptValidationError(LoomaError):
-    """Raised when the agent2script response differs from expected_output."""
+    """Raised when a handoff response violates the resume contract."""
+
+    error_code = "agent2script_validation_error"
+    action = (
+        "Do not execute actual_output. Return exactly expected_output, "
+        "then retry validation."
+    )
 
     def __init__(self, message: str, *, expected=None, actual=None, mismatches=None):
         super().__init__(message)
@@ -30,13 +36,20 @@ class Agent2ScriptValidationError(LoomaError):
 
     def as_dict(self) -> dict:
         return {
-            "error": "agent2script_validation_error",
+            "error": self.error_code,
             "message": str(self),
             "expected_output": self.expected,
             "actual_output": self.actual,
             "mismatches": self.mismatches,
-            "action": (
-                "Do not execute actual_output. Return exactly expected_output, "
-                "then retry validation."
-            ),
+            "action": self.action,
         }
+
+
+class AgentResultValidationError(Agent2ScriptValidationError):
+    """Raised when output.result_file does not satisfy output.output_schema."""
+
+    error_code = "agent_result_validation_error"
+    action = (
+        "Fix output.result_file so it satisfies output.output_schema. "
+        "Do not resume the workflow until result validation passes."
+    )
