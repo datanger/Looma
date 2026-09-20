@@ -40,6 +40,7 @@ def main() -> None:
         print(json.dumps({"status": "invalid", "problems": problems}, ensure_ascii=False))
         return
 
+    rows = sorted(rows, key=lambda row: row.get("date", ""))
     normalized = []
     previous_close = None
     for index, row in enumerate(rows):
