@@ -156,11 +156,11 @@ Metrics:
 Primary baselines should be limited to systems that represent distinct programming models:
 
 1. **Direct SDK / hand-written agent loop**
-2. **LangGraph-style graph/state workflow**
-3. **AutoGen-style agent/conversation framework**
+2. **LangGraph StateGraph**
+3. **Microsoft Agent Framework functional workflow**
 4. **AEP / Looma**
 
-AgentScope can be added if resources permit, but should not replace the three primary baselines.
+AutoGen remains relevant related work and can be retained as a secondary historical baseline, but it is no longer the primary current Microsoft baseline because Microsoft now recommends Agent Framework for new users. AgentScope can be added if resources permit.
 
 For controlled experiments:
 
@@ -347,7 +347,7 @@ Where applicable:
 
 ### Phase 1
 
-- implement W1 in Looma, Direct SDK, LangGraph, and AutoGen with shared business code;
+- implement W1 in Looma, Direct SDK, LangGraph, and Microsoft Agent Framework with shared business code;
 - pin framework/model versions;
 - collect code-complexity and controlled execution metrics.
 

@@ -46,8 +46,8 @@ adaptive_evidence/
 ├── shared/
 ├── direct_sdk/
 ├── langgraph/
-├── autogen/
+├── microsoft_agent_framework/
 └── looma/
 ```
 
-The implementation directories are intentionally not populated until exact dependency/model versions are frozen.
+Phase-1 fixture implementations are now populated. LangGraph is pinned to 1.2.11 and Microsoft Agent Framework Core to 1.19.0 for the controlled orchestration run. The deterministic semantic fixture isolates orchestration equivalence; it is not used to claim comparative LLM quality.
