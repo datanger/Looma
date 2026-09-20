@@ -9,6 +9,12 @@ import sys
 from pathlib import Path
 
 
+def bump_counter(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    count = int(path.read_text(encoding="utf-8")) if path.exists() else 0
+    path.write_text(str(count + 1), encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", required=True)
@@ -16,6 +22,8 @@ def main() -> None:
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
+    bump_counter(repo.parent / ".counts" / f"check-{args.attempt}.txt")
+
     completed = subprocess.run(
         [
             sys.executable,
