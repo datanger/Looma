@@ -99,12 +99,14 @@ Looma 不再重复创建第二套模型接入层。
 
 ## 核心原则
 
-1. **Program owns control flow.** Python 拥有业务控制流与循环。
-2. **Agent owns semantic reasoning.** Agent 负责非确定性语义判断。
+1. **Program owns control flow and acceptance criteria.** Python 拥有业务控制流、循环，以及可以确定性表达的完成条件与验收门槛。
+2. **Agent owns semantic reasoning and evidence acquisition.** Agent 负责非确定性语义判断，以及需要宿主工具完成的搜索、核验和证据获取。
 3. **Runtime owns continuity.** Looma 负责 suspend / state / replay / resume。
 4. **Boundary stays small.** Agent 与 Script 只通过 script2agent / agent2script 交接。
 5. **No duplicate LLM client.** Workflow 不重复配置 LLM API。
 6. **Same command resumes.** 默认恢复动作重新执行原始 Python invocation，而不是暴露内部 resume script。
+7. **Evidence must remain real.** 外部能力失败时可以交给当前宿主补充真实、可核验的证据，但不能用伪造数据让流程继续。
+8. **Completion is a program decision where possible.** Agent 提供语义结果；是否满足完成条件，应尽可能由 Python validation / acceptance gate 决定。
 
 ## AEP 的目标
 
@@ -127,3 +129,20 @@ replay
 并在逻辑上返回到原程序位置继续运行。
 
 这就是 Agent-Embedded Programming。
+
+## 外部能力失败也是普通控制流
+
+AEP 不要求外部 SDK、API 或数据源永远可用。程序可以先通过 `step()` 尝试确定性能力；发生可恢复失败后，通过 `agent()` 把补充研究交回当前宿主，再由普通 Python 校验是否接受结果。
+
+```text
+provider step
+    │
+    ├─ success → continue
+    └─ failure → current Host gathers sourced evidence
+                         ↓
+                  deterministic validation
+                         ↓
+              continue / retry / insufficient
+```
+
+关键约束是：Host 使用的是自己的原生工具，Looma 不创建第二个 Agent；live evidence 必须可核验，fixture/mock 只属于测试；如果证据不足，程序应该显式表达不足，而不是伪装成成功。
