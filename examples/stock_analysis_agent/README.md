@@ -9,8 +9,14 @@ The workflow deliberately separates work that should be code from work that shou
 ```text
 resolve_stock.py
       ↓
-fetch_market_data.py          <- AKShare, no Agent
-      ↓
+fetch_market_data.py          <- try AKShare first
+      │
+      ├─ success ─────────────→ real market rows
+      │
+      └─ unavailable ─→ agent(): host web research
+                           ↓
+                    sourced real market rows
+                           ↓
 build_market_features.py      <- deterministic calculations
       ↓
 agent(): recent-news research <- host-native web research
@@ -56,7 +62,11 @@ ak.stock_zh_a_hist(
 )
 ```
 
-The example uses the returned daily K-line fields including close/open/high/low, volume, turnover value, amplitude, daily change and turnover rate.
+The example uses daily K-line fields including close/open/high/low, volume, turnover value, amplitude, daily change and turnover rate.
+
+AKShare failure is a recoverable condition. If the package, network, or upstream provider is unavailable, the workflow yields control to the **current host Agent** and asks it to obtain the missing market rows through native web/search/browser tools. That fallback must include source URLs and is explicitly forbidden from inventing, interpolating, or estimating prices. If enough sourced real data still cannot be obtained, the workflow fails instead of fabricating a market series.
+
+Synthetic/fixture market rows exist only in deterministic CI tests; they are not a live-analysis fallback.
 
 AKShare is an example-only dependency and is not added to Looma Runtime itself:
 
@@ -88,6 +98,6 @@ Useful options:
 --as-of YYYY-MM-DD  make the analysis reproducible
 ```
 
-The final report is written to the selected work directory.
+The final report is written to the selected work directory. Its top-level status is either `complete` or `insufficient_evidence`; the Workflow, not the Agent, decides that status after deterministic news/analysis validation.
 
 This is an analysis workflow example, not personalized investment advice.
