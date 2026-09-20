@@ -722,6 +722,7 @@ return Review(...)
 | `examples/code_repair.py` | 自动测试/修复闭环 | `pytest → agent repair → pytest` |
 | `examples/batch_review.py` | 批量数据审核 | `for each → step → agent → collect` |
 | `examples/generate_validate.py` | Agent 生成 + 程序校验 | `agent edits artifact → deterministic validation → loop` |
+| `examples/multi_script_workflow/` | 多脚本 Workflow | `collect.py → transform.py → agent → report.py` |
 
 例如代码修复场景保持普通 Python 的流程控制：
 
