@@ -21,7 +21,7 @@ They show how ordinary Python keeps control of branching, loops, retries, batch 
 Install Looma first:
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.1/looma_runtime-0.1.1-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.2/looma_runtime-0.1.2-py3-none-any.whl
 ```
 
 Then run an example normally:
@@ -77,11 +77,13 @@ if / else
 
 The repository includes an automated integration test that performs both suspend/resume cycles and verifies each external script executes exactly once.
 
-For a real Codex-hosted run on a machine with Codex CLI installed and authenticated:
+Run the multi-stage example from inside the already-running Coding Agent host session:
 
 ```bash
-python examples/multi_stage_agent_workflow/run_with_codex.py \
-  --workdir /tmp/looma-codex-e2e
+LOOMA_STATE_DIR=/tmp/looma-multi-stage-state \
+PYTHONPATH=src \
+python examples/multi_stage_agent_workflow/workflow.py \
+  --workdir /tmp/looma-multi-stage
 ```
 
-The helper starts `codex exec --sandbox workspace-write`; Codex itself is instructed to run the workflow, consume each `script2agent`, write each Agent result, pass every returned command through `looma handoff`, and continue until the workflow exits with code 0.
+When the workflow reaches an Agent boundary, control returns to the same host Agent. The host uses its native reasoning, tools and optional subagents, writes the structured result, validates the Resume Contract through `looma handoff`, and continues the original workflow. Looma never launches Codex or another Agent process.
