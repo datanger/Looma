@@ -2,9 +2,9 @@
 
 ## Objective
 
-Looma provides an ordinary-looking Python programming model while retaining the `script2agent` / `agent2script` boundary protocol underneath.
+Looma is a Python implementation of **Agent-Embedded Programming (AEP)**.
 
-The key developer experience is:
+The key programming model is ordinary Python:
 
 ```python
 @workflow
@@ -14,32 +14,72 @@ def process(data):
     return step(apply, decision)
 ```
 
-The function looks synchronous, but an `agent()` call may terminate the current process and continue logically after the original command is run again.
+The function looks synchronous, but an `agent()` boundary may terminate the current Python process. The already-running Coding Agent host completes the task, then the original Python command is resumed and replayed.
+
+Looma never launches Codex, Claude Code, SDW, another Agent process, or subagents. Host-native reasoning, tools, concurrency and subagent scheduling remain owned by the host.
+
+## AEP control handoff
+
+The abstract execution model is:
+
+```text
+Program owns workflow control
+        │
+        ▼
+Agent Boundary
+        │
+        ├── Task Contract
+        ▼
+Existing Coding Agent Host
+        │
+        ├── reasoning / tools / native subagents / concurrency
+        │
+        ├── Result Contract
+        │
+        └── Resume Contract
+        ▼
+Program Runtime
+        │
+        └── validate → replay → continue
+```
+
+Looma maps those concepts to:
+
+```text
+Agent Boundary      -> agent()
+Task Contract       -> script2agent
+Result Contract     -> output.result_file + output.output_schema
+Resume Contract     -> expected_output
+Resume validation   -> guarded agent2script
+Continuation        -> same-command replay/resume
+```
 
 ## Replay instead of source-code splicing
 
-Looma does not splice the upper and lower halves of a Python function and does not serialize a raw Python call stack. It records durable events and restarts the original script.
+Looma does not split Python source around an Agent call and does not serialize a raw Python call stack. It records durable events and restarts the original script.
 
 During replay:
 
 - `step()` returns a previously persisted result;
-- a completed `agent()` returns the persisted Agent result;
+- a completed `agent()` returns the persisted and validated Agent result;
 - a waiting `agent()` re-emits the same `script2agent` request;
 - ordinary Python control flow executes again.
 
-This preserves normal `if`, `for`, `while`, function calls and exceptions without requiring an AST compiler in V0.1.
+This preserves normal `if`, `for`, `while`, function calls and exceptions without requiring an AST compiler.
 
 ## Data plane and control plane
 
 ```text
 Data plane
-    script2agent <-> agent2script
+    script2agent
+    output.result_file
+    agent2script
 
 Control plane
-    run -> event -> suspend -> persist -> same command -> replay -> continue
+    run -> event -> suspend -> persist -> validate -> same command -> replay -> continue
 ```
 
-The Skill defines the boundary contract. Looma Runtime owns the control plane.
+The bundled AEP Skill defines host behavior at the boundary. Looma Runtime owns durable program continuity.
 
 ## Same-command resume
 
@@ -49,22 +89,67 @@ At workflow entry Looma captures:
 sys.executable
 sys.argv
 cwd
+LOOMA_RUN_KEY (optional)
 ```
 
-The generated `script2agent.expected_output` uses the same executable and arguments. The Agent therefore returns the original command as `agent2script`; workflow ids and resume ids remain private to Looma.
+The generated `script2agent.expected_output` uses the same executable and arguments. Workflow ids and continuation ids stay private to Looma.
+
+Before resume, `looma handoff` requires:
+
+```text
+actual.keys   == {"script", "args"}
+actual.script == expected_output.script
+actual.args   == expected_output.args
+```
+
+The Agent result must also exist, be valid JSON, and satisfy `output.output_schema`.
+
+## Result validation
+
+Looma emits structural JSON Schema for builtins and dataclass output models, and preserves schema mappings or Pydantic JSON Schema supplied by callers.
+
+The handoff validator supports the structural subset needed at the Agent boundary, including:
+
+- object / array / string / integer / number / boolean / null;
+- required properties;
+- `additionalProperties`;
+- array `items`;
+- `enum` / `const`;
+- `anyOf` / `oneOf` / `allOf`;
+- local `#/$defs/...` references;
+- basic length/item-count constraints.
+
+Invalid Agent results cannot resume the expected command. Runtime replay also validates structured results as a second line of defense if the guarded handoff path is bypassed.
 
 ## Durable state
 
 Default state lives under `.looma/` and contains:
 
-- an invocation-to-active-run pointer;
+- invocation-to-active-run pointers;
 - workflow state;
 - ordered events;
 - cached `step()` results;
 - generated `script2agent` requests;
 - Agent result files.
 
-A process may exit completely between Agent calls. The next same-command invocation reconstructs logical execution by replaying persisted history.
+JSON state writes use same-directory temporary files plus atomic replacement, reducing the chance that an interrupted write leaves a partially written durable-state file.
+
+Completed and failed runs release their active invocation pointer. Historical run directories remain inspectable.
+
+## Independent workflow instances
+
+By default, one active run is associated with a workflow + command + working directory.
+
+When the same command needs multiple independent logical instances, the caller can set:
+
+```bash
+LOOMA_RUN_KEY=job-a python main.py
+LOOMA_RUN_KEY=job-b python main.py
+```
+
+The run key participates in the invocation fingerprint, so the two active histories are isolated. The same run key continues to identify the same logical active run.
+
+This is instance isolation, not Agent concurrency. Agent/subagent concurrency still belongs to the host.
 
 ## Determinism contract
 
@@ -81,10 +166,52 @@ A mismatch raises `ReplayMismatchError` rather than continuing from an ambiguous
 
 ## Why `step()` exists
 
-Replay re-executes ordinary Python. Therefore replay-unsafe operations must be converted into durable events. `step(fn, *args, **kwargs)` runs `fn` once, persists its JSON-compatible result and returns the saved result on replay.
+Replay re-executes ordinary Python. Therefore replay-unsafe operations must be converted into durable events.
+
+`step(fn, *args, **kwargs)` runs `fn` once, persists its JSON-compatible result, and returns the saved result on replay.
+
+Typical uses include file/database writes, subprocesses, tests, network calls, expensive parsing and other operations that must not be repeated after an Agent suspension.
 
 ## Host-agent boundary
 
-Looma intentionally does not own a model client. A coding-agent host such as Codex, Claude Code or SDW is responsible for reasoning and tool execution. The host receives `script2agent`, writes the requested business result JSON and finally emits the expected `agent2script` command.
+Looma intentionally does not own a model client or Agent launcher.
 
-This separation lets Looma remain model-agnostic and preserves the existing programmatic-coding Skill contract.
+A Coding Agent host such as Codex, Claude Code or SDW is responsible for:
+
+- understanding `script2agent.task`;
+- using its own reasoning and tools;
+- optionally creating native subagents;
+- deciding whether independent work should run concurrently;
+- writing the structured business result;
+- returning the exact resume contract.
+
+The host may optimize execution internally, but that must not change Looma's program semantics.
+
+## Observability
+
+`looma status` lists local runs.
+
+`looma inspect [run-id]` exposes:
+
+- workflow/run status;
+- invocation and optional run key;
+- event history;
+- pending request/result paths;
+- pending output schema;
+- expected resume command;
+- failure information.
+
+This information is diagnostic only and is not required in `agent2script`.
+
+## Current non-goals
+
+The current local Runtime deliberately does not add:
+
+- an LLM client or Agent launcher;
+- a custom Agent `spawn/join` concurrency runtime;
+- a hidden generic retry engine;
+- a distributed scheduler;
+- a pluggable state-store abstraction without a concrete use case;
+- speculative Step primitives without replay-tested semantics.
+
+Retries remain explicit Python control flow or host correction after a validation error. Agent concurrency remains host-native.
