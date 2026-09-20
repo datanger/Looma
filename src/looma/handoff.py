@@ -5,7 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from .exceptions import Agent2ScriptValidationError
+from .exceptions import Agent2ScriptValidationError, AgentResultValidationError
+from .schema import validate_json_schema
 from .serde import load_json
 
 AGENT2SCRIPT_ERROR_BEGIN = "<<<AGENT2SCRIPT_ERROR>>>"
@@ -121,36 +122,54 @@ def _state_for_request(request_file: Path) -> dict | None:
         return None
 
 
-def _ensure_agent_result_exists(request: Mapping[str, Any]) -> Path:
+def _ensure_agent_result_valid(request: Mapping[str, Any]) -> Path:
     output = request.get("output")
     if not isinstance(output, Mapping):
-        raise Agent2ScriptValidationError(
+        raise AgentResultValidationError(
             "script2agent.output must be an object before resume.",
             mismatches=[{"field": "output", "reason": "not_object"}],
         )
+
     result_file = output.get("result_file")
     if not isinstance(result_file, str) or not result_file:
-        raise Agent2ScriptValidationError(
+        raise AgentResultValidationError(
             "script2agent.output.result_file is missing.",
             mismatches=[{"field": "output.result_file", "reason": "missing"}],
         )
+
     path = Path(result_file)
     if not path.exists():
-        raise Agent2ScriptValidationError(
+        raise AgentResultValidationError(
             "Agent result is missing; refusing to resume the workflow.",
+            expected=output.get("output_schema"),
+            actual=None,
             mismatches=[
                 {"field": "output.result_file", "reason": "missing", "actual": str(path)}
             ],
         )
+
     try:
-        load_json(path)
+        result = load_json(path)
     except json.JSONDecodeError as exc:
-        raise Agent2ScriptValidationError(
+        raise AgentResultValidationError(
             "Agent result file is not valid JSON; refusing to resume the workflow.",
+            expected=output.get("output_schema"),
+            actual=None,
             mismatches=[
                 {"field": "output.result_file", "reason": "invalid_json", "actual": str(path)}
             ],
         ) from exc
+
+    schema = output.get("output_schema")
+    mismatches = validate_json_schema(result, schema)
+    if mismatches:
+        raise AgentResultValidationError(
+            "Agent result does not satisfy output.output_schema; refusing to resume the workflow.",
+            expected=schema,
+            actual=result,
+            mismatches=mismatches,
+        )
+
     return path
 
 
@@ -159,14 +178,14 @@ def execute_validated_agent2script(
     request_file: str | Path,
     response_file: str | Path,
 ) -> int:
-    """Validate a host Agent response, then execute only the expected command."""
+    """Validate the Agent result and resume command, then execute only the expected command."""
     request_path = Path(request_file).resolve()
     response_path = Path(response_file).resolve()
     request = load_json(request_path)
     response = _load_response(response_path)
 
     validated = validate_request_response(request, response)
-    _ensure_agent_result_exists(request)
+    _ensure_agent_result_valid(request)
 
     state = _state_for_request(request_path)
     cwd = None
