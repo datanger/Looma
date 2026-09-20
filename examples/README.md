@@ -14,6 +14,7 @@ They show how ordinary Python keeps control of branching, loops, retries, batch 
 | `batch_review.py` | batch processing | review each deterministic record and return a structured verdict |
 | `generate_validate.py` | Agent output + deterministic validator | create/update an artifact until programmatic validation passes |
 | `multi_script_workflow/` | multiple standalone scripts | orchestrate `collect.py → transform.py → agent → report.py` as one resumable workflow |
+| `multi_stage_agent_workflow/` | multi-stage Agent/Script workflow | `prepare.py → Agent → analyze.py → Agent → gate.py → summary/detailed report` |
 
 ## How to run
 
@@ -53,3 +54,34 @@ The outer `workflow.py` owns orchestration. Each standalone script runs through 
 python examples/multi_script_workflow/workflow.py \
   --workdir /tmp/looma-multi-script
 ```
+
+## Multi-stage Agent/Script workflow
+
+`multi_stage_agent_workflow/` demonstrates two Agent boundaries and a final deterministic branch:
+
+```text
+prepare.py
+   ↓
+Agent #1
+   ↓
+analyze.py
+   ↓
+Agent #2
+   ↓
+gate.py
+   ↓
+if / else
+ ├─ summary_report.py
+ └─ detailed_report.py
+```
+
+The repository includes an automated integration test that performs both suspend/resume cycles and verifies each external script executes exactly once.
+
+For a real Codex-hosted run on a machine with Codex CLI installed and authenticated:
+
+```bash
+python examples/multi_stage_agent_workflow/run_with_codex.py \
+  --workdir /tmp/looma-codex-e2e
+```
+
+The helper starts `codex exec --sandbox workspace-write`; Codex itself is instructed to run the workflow, consume each `script2agent`, write each Agent result, pass every returned command through `looma handoff`, and continue until the workflow exits with code 0.
