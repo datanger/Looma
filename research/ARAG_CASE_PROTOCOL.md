@@ -161,3 +161,37 @@ This case study tests two distinct hypotheses and they must not be conflated:
 
 The second is a practical systems property, not proof that the programming
 abstraction alone causes higher model intelligence.
+
+## Reproducibility utilities now implemented
+
+Freeze a development subset independently of source ordering:
+
+```bash
+python -m experiments.case_studies.arag_host_native.freeze_subset \
+  --questions data/musique/questions.json \
+  --size 100 \
+  --seed aep-paper-v1 \
+  --output research-data/musique-dev100.json \
+  --manifest research-data/musique-dev100.manifest.json
+```
+
+Record immutable file digests for each baseline/AEP run with
+`run_manifest.py`.
+
+After both prediction files have been evaluated, produce a paired comparison:
+
+```bash
+python -m experiments.case_studies.arag_host_native.compare_predictions \
+  --baseline results/original/predictions.jsonl \
+  --aep results/aep/predictions.jsonl \
+  --bootstrap 10000 \
+  --output results/paired-comparison.json
+```
+
+The comparison joins by question id, reports deterministic Contain-Match
+accuracy, answer rate, retrieval-token/tool-call deltas, 95% paired bootstrap
+intervals, and an exact McNemar test for paired Contain-Match correctness.
+If both inputs already contain A-RAG `llm_accuracy` fields, it also reports the
+paired LLM-accuracy delta.
+
+These utilities intentionally do not invent missing LLM-judge scores.
