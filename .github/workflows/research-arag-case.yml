@@ -1,0 +1,74 @@
+name: research-arag-case
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "experiments/case_studies/arag_host_native/**"
+      - "experiments/requirements-arag-case.txt"
+      - ".github/workflows/research-arag-case.yml"
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e .
+      - run: python -m pip install -r experiments/requirements-arag-case.txt
+
+      - name: Build tiny A-RAG corpus
+        run: |
+          mkdir -p research-results/arag-fixture
+          cat > research-results/arag-fixture/chunks.json <<'JSON'
+          [
+            {"id":"0","text":"Paris is the capital city of France."},
+            {"id":"1","text":"Berlin is the capital city of Germany."}
+          ]
+          JSON
+          cat > research-results/arag-fixture/config.yaml <<'YAML'
+          data:
+            chunks_file: research-results/arag-fixture/chunks.json
+            index_dir: research-results/arag-fixture/missing-index
+          YAML
+
+      - name: Exercise unmodified A-RAG retrieval bridge
+        run: |
+          python -m experiments.case_studies.arag_host_native.bridge             --config research-results/arag-fixture/config.yaml             --session research-results/arag-fixture/session.json             --no-semantic             call --tool keyword_search             --arguments '{"keywords":["Paris","France"]}'             > research-results/arag-fixture/search.json
+
+          python -m experiments.case_studies.arag_host_native.bridge             --config research-results/arag-fixture/config.yaml             --session research-results/arag-fixture/session.json             --no-semantic             call --tool read_chunk             --arguments '{"chunk_ids":["0"]}'             > research-results/arag-fixture/read.json
+
+      - name: Exercise Looma host-native A-RAG workflow
+        run: |
+          python -m experiments.case_studies.arag_host_native.smoke_driver             --config research-results/arag-fixture/config.yaml             --session research-results/arag-fixture/looma-session.json
+
+      - name: Verify persisted evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          session = json.loads(
+              Path("research-results/arag-fixture/looma-session.json")
+              .read_text(encoding="utf-8")
+          )
+          assert "0" in session["chunks_read_ids"], session
+          assert any(
+              item["tool_name"] == "keyword_search"
+              for item in session["retrieval_logs"]
+          )
+          assert any(
+              item["tool_name"] == "read_chunk"
+              for item in session["retrieval_logs"]
+          )
+          print(json.dumps(session, indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aep-arag-host-native-smoke
+          path: research-results/arag-fixture/
