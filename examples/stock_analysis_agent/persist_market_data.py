@@ -28,26 +28,40 @@ def main() -> None:
     rows = research.get("rows", [])
     source_urls = research.get("source_urls", [])
 
+    problems = []
     if research.get("coverage_complete") is not True:
-        raise RuntimeError("host market research is not marked coverage_complete")
+        problems.append("host market research is not marked coverage_complete")
     if len(source_urls) < 1 or not all(isinstance(url, str) and url.startswith(("http://", "https://")) for url in source_urls):
-        raise RuntimeError("host market research must include at least one source URL")
+        problems.append("host market research must include at least one source URL")
     if len(rows) < 5:
-        raise RuntimeError("host market research must contain at least 5 real trading rows")
+        problems.append("host market research must contain at least 5 real trading rows")
+
+    if problems:
+        print(json.dumps({"status": "invalid", "problems": problems}, ensure_ascii=False))
+        return
 
     normalized = []
     previous_close = None
     for index, row in enumerate(rows):
         if not isinstance(row.get("date"), str):
-            raise RuntimeError(f"row {index} is missing date")
+            print(json.dumps({"status": "invalid", "problems": [f"row {index} is missing date"]}, ensure_ascii=False))
+            return
         item = {"date": row["date"]}
-        for field in REQUIRED_NUMERIC:
-            item[field] = as_number(row.get(field), field, index)
+        try:
+            for field in REQUIRED_NUMERIC:
+                item[field] = as_number(row.get(field), field, index)
+        except RuntimeError as exc:
+            print(json.dumps({"status": "invalid", "problems": [str(exc)]}, ensure_ascii=False))
+            return
 
         turnover_value = row.get("turnover_value")
-        item["turnover_value"] = (
-            None if turnover_value is None else as_number(turnover_value, "turnover_value", index)
-        )
+        try:
+            item["turnover_value"] = (
+                None if turnover_value is None else as_number(turnover_value, "turnover_value", index)
+            )
+        except RuntimeError as exc:
+            print(json.dumps({"status": "invalid", "problems": [str(exc)]}, ensure_ascii=False))
+            return
 
         item["amplitude_pct"] = round(
             (item["high"] - item["low"]) / item["close"] * 100.0, 4
