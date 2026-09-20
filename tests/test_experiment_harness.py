@@ -23,7 +23,8 @@ def run_experiment(*args: str):
 def test_reliability_fault_harness_smoke(tmp_path: Path):
     output = tmp_path / "reliability.json"
     result = run_experiment(
-        "experiments/reliability_faults.py",
+        "-m",
+        "experiments.reliability_faults",
         "--cases",
         "valid,missing_result,wrong_result_schema,wrong_resume_args",
         "--output",
@@ -40,7 +41,8 @@ def test_reliability_fault_harness_smoke(tmp_path: Path):
 def test_runtime_scaling_harness_smoke(tmp_path: Path):
     output = tmp_path / "runtime.json"
     result = run_experiment(
-        "experiments/runtime_scaling.py",
+        "-m",
+        "experiments.runtime_scaling",
         "--events",
         "2",
         "--repeats",
@@ -60,7 +62,8 @@ def test_runtime_scaling_harness_smoke(tmp_path: Path):
 def test_code_metrics_harness_smoke(tmp_path: Path):
     output = tmp_path / "metrics.json"
     result = run_experiment(
-        "experiments/code_metrics.py",
+        "-m",
+        "experiments.code_metrics",
         f"runtime={PROJECT_ROOT / 'src' / 'looma' / 'runtime.py'}",
         "--output",
         str(output),
