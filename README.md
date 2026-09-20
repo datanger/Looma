@@ -3,23 +3,25 @@
 > **Skills that run, pause, think, and continue.**  
 > **让 Skill 不再只是“告诉 Agent 怎么做”，而是让 Agent 真正进入程序执行流。**
 
-Looma 是 **Agent-Embedded Programming（AEP，智能体嵌入式编程）** 的 Python Runtime / Skill Framework。
+Looma 是 **Agent-Embedded Programming（AEP，智能体嵌入式编程）** 的一种 Python 实现。
 
-**Agent-Embedded Programming** 是 Looma 正式采用的范式名称：
-
-> **把宿主 Agent 作为一种可暂停、可恢复的智能计算单元，直接嵌入普通程序控制流。**
-
-在 AEP 中，Python 继续拥有 `if`、`for`、`while`、函数调用和异常处理等程序控制权；Codex、Claude Code、SDW 等宿主 Coding Agent 提供语义理解、分析、判断、规划和 Review 等智能能力；Looma Runtime 负责两者之间的 suspend、state、replay、resume 与边界协议。
-
-Looma 同时把 **Executable Skill（可执行 Skill）** 定义为 AEP 的 Skill 封装形式：
+这里先区分三个层次：
 
 ```text
 Agent-Embedded Programming = 编程范式
-Executable Skill           = Skill 封装形式
-Looma                      = Python Runtime / Framework
+Executable Skill           = AEP 的一种 Skill 封装形态
+Looma                      = AEP 的一个 Python Runtime / Framework 实现
 ```
 
-Skill 因此不再只是 Markdown 中的说明和提示词，而可以拥有真正的程序控制流、循环、状态、函数调用、暂停与恢复能力。
+**Agent-Embedded Programming** 指的是：
+
+> **把宿主 Agent 作为一种可暂停、可恢复的智能计算单元，直接嵌入普通程序控制流。**
+
+在 AEP 中，程序继续拥有 `if`、`for`、`while`、函数调用和异常处理等控制权；Codex、Claude Code、SDW 等宿主 Coding Agent 提供语义理解、分析、判断、规划和 Review 等智能能力；具体 Runtime 实现负责两者之间的 suspend、state、replay、resume 与边界协议。
+
+**Executable Skill（可执行 Skill）** 可以作为这种范式的一种 Skill 封装形态：Skill 不再只是 Markdown 中的说明和提示词，而可以与真正的程序控制流、循环、状态、函数调用、暂停与恢复机制结合。
+
+Looma 提供了其中一种具体实现。
 
 使用 Looma，你可以继续用普通 Python 编写 `if`、`for`、`while`、函数和脚本，只在真正需要智能判断的位置插入：
 
@@ -35,9 +37,11 @@ Agent 完成后，Looma 重新运行原来的 Python 命令，并自动恢复到
 
 ---
 
-## Why Looma?
+## Why Agent-Embedded Programming?
 
-现在的 Agent Skill 和 Agent Workflow，通常落在两个极端。
+要理解 Looma，首先要理解它所实现的 AEP 范式试图解决什么问题。
+
+现在的 Agent Skill 和 Agent Workflow，通常落在两个方向。
 
 ### 传统 Skill：有“知识”，没有“运行时”
 
@@ -118,9 +122,9 @@ while ...:
 
 ---
 
-## Looma 的答案：让宿主 Agent 成为程序的一部分
+## AEP 的核心思路：让宿主 Agent 成为程序的一部分
 
-Looma 的设计是：
+AEP 的抽象结构是：
 
 ```text
                  Python Program
@@ -151,31 +155,33 @@ Looma 的设计是：
 
 也就是说：
 
-> **Python 拥有流程控制权，宿主 Coding Agent 提供智能，Looma 负责把两者接起来。**
+> **程序拥有流程控制权，宿主 Coding Agent 提供智能，Runtime 负责把两者连接起来。**
+
+Looma 是这一结构的一种 Python 实现。
 
 ---
 
 # Agent-Embedded Programming
 
-Looma 把 **Agent-Embedded Programming（AEP）** 作为核心编程范式，把 Agent 从“程序外部的模型服务”变成“程序内部可恢复的智能计算单元”。
+**Agent-Embedded Programming（AEP）** 把 Agent 从“程序外部的模型服务”变成“程序内部可恢复的智能计算单元”。
 
-在 AEP 上，Looma 再把 Skill 从“说明文档”推进到“可执行能力”。
+在这个范式下，Skill 也可以从“说明文档”扩展为“可执行能力”。
 
-可以把它理解为三代形态：
+可以用下面三类形态来理解它们的差异：
 
 | 范式 | Skill / Workflow 是什么 | LLM 在哪里 | 程序控制流 |
 |---|---|---|---|
 | Traditional Skill | Prompt / Markdown / SOP | 宿主 Agent | 主要由 Agent 自己理解 |
 | LLM Workflow Framework | Graph / Agent Framework / Orchestrator | 应用自己的 LLM API | Framework 控制 |
-| **AEP + Looma Executable Skill** | **Skill + Python Runtime + Boundary Contract** | **宿主 Coding Agent** | **普通 Python 控制** |
+| **Agent-Embedded Programming / Executable Skill** | **Skill + Program Runtime + Agent Boundary** | **宿主 Coding Agent** | **普通程序控制流** |
 
-Looma 的目标不是替代 Codex、Claude Code 或 SDW。
+AEP 的目标不是替代 Codex、Claude Code 或 SDW。
 
 恰恰相反：
 
-> **Looma 把这些 Coding Agent 当成现成的 Intelligence Runtime。**
+> **AEP 把这些已有 Coding Agent 视为可以被程序复用的 Intelligence Runtime。**
 
-Skill 只需要描述：
+在这种范式下，Skill 只需要描述：
 
 - 什么时候需要 Agent
 - Agent 应该解决什么问题
@@ -759,78 +765,83 @@ looma skill-path
 
 ---
 
-# Traditional Skill vs Looma
+# Traditional Skill vs Executable Skill
+
+这里比较的是 **Skill 形态**，不是 Looma 与传统 Skill。
 
 传统 Skill：
 
 ```text
-Markdown
+Markdown / Prompt / SOP
   ↓
 Agent understands instructions
   ↓
-Agent manually orchestrates actions
+Agent orchestrates actions
 ```
 
-Looma：
+AEP 下的 Executable Skill：
 
 ```text
-Skill
+Skill specification
   +
-Python Runtime
+Program Runtime
   +
-Boundary Protocol
+Agent / Script Boundary
   ↓
-Executable / resumable workflow
+Executable / resumable program flow
 ```
 
-所以 Looma 并不是想把 Skill 变成另一个 Agent Framework。
+区别在于：传统 Skill 主要向 Agent 提供知识、规则和操作方法；Executable Skill 进一步把这些能力连接到真实程序控制流，使 Skill 可以参与循环、状态迁移、确定性脚本执行以及 Agent 调用。
 
-它的方向是：
-
-> **让 Skill 获得程序能力，同时继续使用宿主 Agent 已经拥有的智能能力。**
+> **Executable Skill 是 AEP 可以采用的一种 Skill 形态；Looma 只是它的一种具体实现。**
 
 ---
 
-# Looma vs LLM Workflow Frameworks
+# Agent-Embedded Programming vs API-centric LLM Workflows
 
-Looma 和 LangGraph、AutoGen、CrewAI 一类 Workflow / Agent Framework 的出发点不同。
+这里比较的是 **编程范式**，不是 Looma 与其它框架。
 
-典型 LLM Workflow Framework：
+一种常见的 API-centric LLM Workflow 结构是：
 
 ```text
 Application
    ↓
-Agent Framework
+Workflow / Agent Framework
    ↓
 LLM Client
    ↓
 Model API
 ```
 
-Looma：
+Agent-Embedded Programming 的结构是：
 
 ```text
-Python Application
+Program
    ↓
-Looma Runtime
+AEP Runtime
    ↓
-script2agent
+Agent Boundary
    ↓
 Existing Coding Agent Host
    ↓
-Codex / Claude / SDW model runtime
+Agent result
+   ↓
+Program continues
 ```
 
-Looma 不希望成为：
+两种方式都可以构建复杂智能 Workflow，但关注点不同。
 
-- 新的 LLM SDK
-- 新的 Model Gateway
-- 新的 Prompt Framework
-- 新的 Multi-Agent Chat Framework
+API-centric Workflow 通常把模型调用本身作为应用的一部分，因此应用负责模型客户端、Endpoint、鉴权、Agent Loop 等能力。
 
-Looma 关注的是：
+AEP 则优先复用已经存在的 Coding Agent 宿主，把重点放在：
 
-> **如何让已经存在的 Agent 能力进入普通程序控制流，并能够暂停、退出、恢复和循环。**
+- 如何让 Agent 进入普通程序控制流；
+- 如何在 Agent 执行期间暂停程序；
+- 如何持久化状态；
+- 如何恢复原程序；
+- 如何让 Agent 与确定性脚本在循环中协作。
+
+AEP 本身并不限定具体 Runtime、编程语言或边界协议。**Looma 是 AEP 的一个 Python 实现，并选择了 `script2agent / agent2script` 与 same-command replay/resume 作为当前实现机制。**
 
 ---
 
@@ -949,7 +960,7 @@ workflow completion
 
 # Philosophy
 
-Looma 的核心并不是：
+**Agent-Embedded Programming** 的核心并不是：
 
 > “再做一个 Agent。”
 
@@ -957,7 +968,7 @@ Looma 的核心并不是：
 
 > **让已经存在的 Agent 成为程序的一部分。**
 
-这也是 **Agent-Embedded Programming** 的核心定义。
+Looma 只是这一思想的一种实现。
 
 不是：
 
