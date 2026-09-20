@@ -127,20 +127,33 @@ same-command replay / resume
 
 Agent/subagent 的推理、工具调用、并发调度与结果汇总都属于宿主本身，不属于 Looma Runtime。
 
-## Examples
+## Example
 
-仓库提供：
+仓库只保留一个完整案例：[examples/repair_workflow/](examples/repair_workflow/)。
 
-- 单次 Agent 判断
-- `if / elif / else` 分支
-- `for` / `while` 循环
-- test → Agent repair → test
-- batch review
-- generate → validate → retry
-- multi-script workflow
-- multi-stage Agent / Script workflow
+它实现一个有实际意义的 **代码修复闭环**：
 
-详见 [examples/README.md](examples/README.md)。
+```text
+跨脚本准备 workspace
+        ↓
+跨脚本运行测试
+        ↓
+测试失败
+        ↓
+agent(...) 把修复任务交回当前宿主
+        ↓
+宿主可使用 native subagents 并发分析
+        ↓
+宿主修改代码
+        ↓
+resume / replay
+        ↓
+Python 循环再次运行测试
+        ↓
+通过后跨脚本生成最终报告
+```
+
+这个单一案例同时覆盖 multi-script、loop、多次 Agent boundary、durable replay、结构化结果校验和 Host-native subagent concurrency。
 
 ## Documentation
 
