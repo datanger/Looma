@@ -1,25 +1,26 @@
-# Looma v0.1.0
+# Looma v0.1.1
 
-First public experimental release of Looma.
+Patch release adding strict resume-command validation.
 
-Looma is the Python runtime for **Agent-Embedded Programming (AEP / 智能体嵌入式编程)**.
+Looma is a Python implementation of **Agent-Embedded Programming (AEP / 智能体嵌入式编程)**.
 
-## Highlights
+## New in v0.1.1
 
-- `@workflow` for resumable Python workflows.
-- `step()` for replay-safe deterministic or side-effectful execution.
-- `agent()` for embedding a host coding agent into ordinary Python control flow.
-- Same-command replay/resume.
-- `script2agent` / `agent2script` boundary protocol.
-- Loop support: Agent calls can appear inside normal `for` / `while` flows.
-- Bundled **Agent-Embedded Programming Skill** for Codex, Claude Code, SDW and other coding-agent hosts.
-- No direct LLM API dependency inside Looma workflows.
-- Python 3.10–3.13 CI coverage.
+- Strict validation of Agent-returned `agent2script` against `script2agent.expected_output`.
+- Exact-match enforcement for `script`, `args`, and top-level fields.
+- New guarded handoff executor:
+  `looma handoff --request <script2agent.json> --response <agent2script.json>`.
+- Mismatched commands are never executed.
+- Validation failures return exit code `76` and a structured `AGENT2SCRIPT_ERROR` payload containing expected vs actual output.
+- Handoff verifies that the Agent result JSON exists before resume.
+- Validated resumes restore the original workflow `cwd` from persisted state.
+- Tests verify that a mismatched command cannot produce side effects and that an exact match is executed.
+- Bundled Agent-Embedded Programming Skill documents the validation/retry contract.
 
 ## Install
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.0/looma_runtime-0.1.0-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.1/looma_runtime-0.1.1-py3-none-any.whl
 ```
 
-Looma v0.1.0 is experimental. The public API and persistence format may still evolve.
+Looma remains experimental; persistence and host-adapter APIs may evolve.
