@@ -38,6 +38,184 @@ Agent 完成后，Looma 重新运行原来的 Python 命令，并自动恢复到
 
 **无需在你的 Workflow 中再次配置 LLM API、API Key、Endpoint、Model SDK 或第二套 Agent Loop。**
 
+
+---
+
+# 功能特性
+
+Looma 当前围绕 AEP 提供以下能力：
+
+| 能力 | 说明 |
+|---|---|
+| **普通 Python 控制流** | 继续使用 `if / for / while / function`，不要求改写成 Graph DSL |
+| **Host-native Agent Boundary** | `agent(...)` 只产生任务说明并暂停；当前宿主 Agent 原生完成推理与工具调用 |
+| **Durable Step** | `step(...)` 持久化已完成结果，replay 时不会重复执行已完成副作用 |
+| **Suspend / Replay / Resume** | Agent 工作期间 Python 进程可以退出，之后通过 same-command replay 恢复 |
+| **多轮 Agent Workflow** | 一个 Workflow 中可以多次 `agent(...)`，支持循环、分支和多阶段流程 |
+| **多脚本 Workflow** | 可以编排已有独立 Python 脚本/工具，不需要把工程重写成单文件 |
+| **严格 Resume Contract** | `agent2script` 必须与 `expected_output` 完全一致，否则拒绝执行 |
+| **Result Guard** | Agent 业务结果必须先写入 `output.result_file` 且为合法 JSON，才允许恢复 |
+| **Host-native Subagent / 并发** | 程序只描述可并行任务；subagent、并发调度和汇总完全由宿主原生实现 |
+| **Host-independent Boundary** | Looma 不依赖某个模型 API；Codex、Claude Code、SDW 等宿主可按同一边界语义工作 |
+| **Executable Skill** | Wheel 内置 AEP Skill，告诉宿主如何处理 suspend、task、result 和 resume |
+| **可测试的持久化执行** | 已有 process restart、loop、多 Agent、多脚本、resume guard 等自动化测试 |
+
+其中并发能力尤其需要注意：
+
+```text
+Looma / Python
+    ↓
+返回“这些任务可以独立执行”的任务说明
+    ↓
+Host Agent
+    ├─ 顺序执行
+    └─ 或使用宿主原生 subagents 并发执行
+            ↓
+          汇总结果
+            ↓
+       写 result_file
+            ↓
+       Resume Workflow
+```
+
+Looma **不创建线程来模拟 Agent 并发，也不调用任何 Agent CLI / SDK / API 来启动 subagent**。并发是宿主 Agent 的执行策略，而 Looma 只定义任务边界和程序恢复语义。
+
+---
+
+# 核心原则
+
+Looma 的实现遵循下面这些原则。它们也是 AEP 在 Looma 中最重要的设计约束。
+
+### 1. Program owns control flow
+
+**程序拥有控制流。**
+
+循环、分支、终止条件、确定性计算和业务状态都应由普通 Python 表达：
+
+```python
+for item in items:
+    result = step(process, item)
+    review = agent(task="审核结果", input=result)
+
+    if review["done"]:
+        break
+```
+
+Agent 参与程序，但不取代程序。
+
+### 2. Looma describes work; the host executes work
+
+**Looma 描述任务，宿主执行任务。**
+
+`agent(...)` 的本质不是“调用 Agent”，而是生成一份 `script2agent` 任务说明：
+
+```text
+task
+input
+output_schema
+result_file
+expected_output
+```
+
+当前已经运行的宿主 Agent 自己决定怎样完成它。
+
+### 3. Never launch another Agent
+
+**Looma 永远不负责创建第二个 Agent。**
+
+禁止把 Looma 实现成：
+
+```text
+Looma → codex CLI
+Looma → Claude Code CLI
+Looma → Agent SDK
+Looma → LLM API
+Looma → subprocess → another Agent
+```
+
+模型访问、会话、上下文、工具、终端和 subagent 都属于当前宿主。
+
+### 4. Concurrency belongs to the host
+
+**并发属于宿主执行策略。**
+
+如果任务说明包含多个无依赖子任务，宿主可以：
+
+```text
+Host Agent
+   ├─ subagent A
+   ├─ subagent B
+   └─ subagent C
+          ↓
+        gather
+```
+
+也可以顺序完成。
+
+Looma 只表达 **what to do**，宿主决定 **how to execute it**。
+
+### 5. Keep the Agent / Script boundary small
+
+Agent 和 Script 之间只传递必要信息：
+
+```text
+script2agent
+agent2script
+result_file
+```
+
+业务结果不塞进 `agent2script`，运行时内部状态也不暴露给 Agent。
+
+### 6. expected_output is a Resume Contract
+
+`expected_output` 不是建议，而是恢复契约。
+
+只有：
+
+```text
+actual.script == expected_output.script
+actual.args   == expected_output.args
+actual.keys   == {"script", "args"}
+```
+
+全部成立，Looma 才允许继续执行。
+
+### 7. Side effects must be replay-safe
+
+Replay 会重新从 Workflow 入口执行，因此有副作用或高成本的工作应该放进 `step(...)`。
+
+```python
+result = step(run_tests, repo)
+```
+
+已经完成的 step 在 replay 时直接返回历史结果，而不会重复执行。
+
+### 8. Resume should return to the original program
+
+Looma 默认通过 **same-command replay/resume** 恢复，而不是要求用户管理：
+
+```text
+resume.py
+workflow_id
+continuation_id
+program_counter
+```
+
+目标是让：
+
+```python
+result = agent(...)
+```
+
+在逻辑上仍然表现得像一个普通函数调用。
+
+### 9. Host capability is an optimization, not a semantic dependency
+
+Workflow 的正确性不应该依赖某个宿主是否支持 subagent、特定模型或某种并发机制。
+
+宿主能力可以让任务更快、更强，但同一任务说明在能力较弱的宿主上仍应能够采用串行或简化策略完成。
+
+
 ---
 
 ## Why Agent-Embedded Programming?
@@ -682,7 +860,7 @@ return cached result
 
 ## `agent()`
 
-调用宿主 Coding Agent：
+定义一个交还给当前宿主 Coding Agent 的任务边界：
 
 ```python
 review = agent(
@@ -697,9 +875,11 @@ review = agent(
 ```text
 agent()
  ↓
+生成给当前宿主的任务说明
+ ↓
 script2agent
  ↓
-suspend
+suspend / return control to host
 ```
 
 恢复后：
@@ -1012,7 +1192,7 @@ Looma 会直接拒绝继续，而不是静默进入错误状态。
 
 Looma 目前处于 **V0.1 / experimental**。
 
-当前已经验证：
+当前 Runtime 自动化测试已经验证：
 
 ```text
 ordinary Python
@@ -1021,9 +1201,9 @@ agent()
      ↓
 suspend
      ↓
-host coding agent
+host contract result
      ↓
-same-command agent2script
+validated same-command agent2script
      ↓
 replay
      ↓
@@ -1031,6 +1211,8 @@ agent() returns
      ↓
 continue original function
 ```
+
+这里的自动化测试使用程序模拟 Host Contract；真实 Coding Agent 的执行发生在已经存在的宿主会话中，不由 Looma 在测试进程里启动。
 
 以及：
 
@@ -1052,8 +1234,8 @@ workflow completion
 
 接下来重点包括：
 
-- Host Adapter：Codex / SDW / Claude Code 更自动地消费 `script2agent`
-- Agent result schema 更严格的校验
+- Host-native integration contract：让 Codex / SDW / Claude Code 等宿主更自然地消费 `script2agent`，但不由 Looma 启动 Agent
+- 更严格的 Agent result schema 校验
 - Workflow history / inspect
 - Retry / failure policies
 - Concurrent workflow instances
@@ -1061,6 +1243,7 @@ workflow completion
 - Durable distributed backend
 - 更丰富的 Step primitive
 - 更完整的 Skill packaging / discovery
+- Host-native subagent / concurrency task conventions
 - 更好的 observability
 
 ---
