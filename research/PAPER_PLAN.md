@@ -25,7 +25,7 @@ The expected engineering consequence is less application-specific agent infrastr
 ## Core design principles
 
 1. **Host Capability Inheritance** — applications reuse the reasoning, planning, tool-use, and native subagent capabilities of the Host instead of rebuilding them.
-2. **Bounded Autonomy** — the Host is free to choose its reasoning/tool trajectory inside an explicit semantic task boundary.
+2. **Bounded Autonomy** — the Host is free to choose its reasoning/tool trajectory inside an explicit semantic task boundary. This is a programming boundary, not a security sandbox; actual tool permissions remain Host-controlled.
 3. **Contract-Guarded Execution** — Task, Result, Resume, and application Acceptance contracts guard the non-deterministic Agent boundary.
 4. **Durable Continuity** — suspend, durable state, replay, and resume preserve ordinary Python control flow across Host execution.
 
@@ -101,6 +101,7 @@ Can Looma reject malformed or unsafe boundary outputs and resume correctly after
 
 Fault classes:
 
+- non-serializable/replay-inconsistent boundary input where applicable;
 - missing Agent result;
 - malformed result JSON;
 - result-schema violation;
@@ -265,10 +266,12 @@ The existing stock-analysis Agent demonstrates real external-data fallback, evid
 A compact formalization can model a boundary as:
 
 ```text
-B = (T, I, O, A)
+B = (T, I, O, R, A)
 ```
 
-where T is the task, I the input, O the output contract, and A the deterministic acceptance criteria. The Agent may choose an internal action trajectory pi freely, but the boundary result must satisfy O and A before the program continues.
+where T is the task, I the program-provided input, O the result contract, R the resume contract, and A the deterministic acceptance criteria. The Agent may choose an internal action trajectory pi freely, but its result must satisfy O and A, and the continuation must satisfy R before the program continues.
+
+**Current-runtime precision:** Looma v0.1.4 normalizes Agent input to replay-safe JSON-compatible data and hashes it for replay consistency; it does not yet expose a user-declared `input_schema` symmetric with `output_schema`. The paper must describe this accurately. If symmetric input-schema validation becomes a paper claim, it must be implemented and evaluated first.
 
 ### 4. Looma Runtime
 
