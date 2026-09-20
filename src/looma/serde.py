@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
 from .exceptions import SerializationError
+from .schema import validate_json_schema
 
 
 def normalize_json(value: Any) -> Any:
@@ -28,9 +31,28 @@ def normalize_json(value: Any) -> Any:
 
 
 def dump_json(path: Path, value: Any) -> None:
+    """Atomically persist JSON so interrupted writes do not corrupt durable state."""
+    normalized = normalize_json(value)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(normalize_json(value), f, ensure_ascii=False, indent=2, sort_keys=True)
+
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=str(path.parent),
+        text=True,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(normalized, f, ensure_ascii=False, indent=2, sort_keys=True)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_name, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def load_json(path: Path) -> Any:
@@ -45,17 +67,49 @@ def json_hash(value: Any) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _validate_structural_result(value: Any, schema: Any) -> None:
+    errors = validate_json_schema(value, schema)
+    if errors:
+        raise SerializationError(
+            "Agent result does not satisfy output_schema: "
+            + json.dumps(errors, ensure_ascii=False, separators=(",", ":"))
+        )
+
+
 def coerce_result(value: Any, schema: Any) -> Any:
-    if schema is None or isinstance(schema, dict):
+    if schema is None:
         return value
+
+    if isinstance(schema, dict):
+        _validate_structural_result(value, schema)
+        return value
+
     if hasattr(schema, "model_validate"):
         return schema.model_validate(value)
+
     if hasattr(schema, "__dataclass_fields__"):
         if not isinstance(value, dict):
             raise SerializationError(f"Expected JSON object for dataclass {schema.__name__}")
-        return schema(**value)
+        from .protocol import describe_schema
+
+        _validate_structural_result(value, describe_schema(schema))
+        try:
+            return schema(**value)
+        except TypeError as exc:
+            raise SerializationError(
+                f"Invalid fields for dataclass {schema.__name__}: {exc}"
+            ) from exc
+
     if schema in (dict, list, str, int, float, bool):
-        if not isinstance(value, schema):
-            raise SerializationError(f"Expected {schema.__name__}, got {type(value).__name__}")
+        expected_schema = {
+            dict: {"type": "object"},
+            list: {"type": "array"},
+            str: {"type": "string"},
+            int: {"type": "integer"},
+            float: {"type": "number"},
+            bool: {"type": "boolean"},
+        }[schema]
+        _validate_structural_result(value, expected_schema)
         return value
+
     return value
