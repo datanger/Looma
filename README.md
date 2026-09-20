@@ -709,6 +709,46 @@ return Review(...)
 
 ---
 
+# Examples
+
+项目内置了一组常见的 Agent-Embedded Programming 编程场景，不只是最小 API Demo，而是可以直接映射到真实工程的控制流模式：
+
+| Example | 场景 | 核心控制流 |
+|---|---|---|
+| `examples/basic.py` | 单次 Agent 判断 | `step → agent → step` |
+| `examples/branching.py` | Agent 决定分支 | `agent → if / elif / else` |
+| `examples/loop.py` | 有界迭代优化 | `for → step → agent → break/continue` |
+| `examples/while_retry.py` | 校验失败后重试 | `while → validate → agent → retry` |
+| `examples/code_repair.py` | 自动测试/修复闭环 | `pytest → agent repair → pytest` |
+| `examples/batch_review.py` | 批量数据审核 | `for each → step → agent → collect` |
+| `examples/generate_validate.py` | Agent 生成 + 程序校验 | `agent edits artifact → deterministic validation → loop` |
+
+例如代码修复场景保持普通 Python 的流程控制：
+
+```python
+@workflow
+def repair_until_green(repo, max_attempts=3):
+    for attempt in range(max_attempts):
+        tests = step(run_tests, repo)
+
+        if tests["returncode"] == 0:
+            return tests
+
+        agent(
+            task="分析失败原因并直接修改仓库，使测试通过。",
+            input={"attempt": attempt, "tests": tests},
+            output_schema=RepairResult,
+        )
+
+    return step(run_tests, repo)
+```
+
+这里的循环、终止条件和测试执行仍由 Python 控制；Agent 只负责需要语义推理和代码修改的部分。
+
+完整说明见 `examples/README.md`。
+
+---
+
 # Installation
 
 ## Install the published wheel
