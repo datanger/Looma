@@ -1,0 +1,63 @@
+{
+  "schema": "aep-regulatory-benchmark-v1",
+  "corpus": {
+    "name": "Synthetic regulatory fixture for CI only",
+    "redistributable": true,
+    "notes": "These policies are invented solely to test benchmark tooling. They are not ISO 21448 text or claims about any real standard."
+  },
+  "items": [
+    {
+      "id": "synthetic-cross-doc-001",
+      "question": "Under the synthetic rules, may Scenario A enter validation?",
+      "scenario": "Scenario A has a verified trigger classification and an approved evidence record.",
+      "task_type": "cross_document",
+      "answerable": true,
+      "gold_answer": "yes",
+      "minimum_hops": 2,
+      "evidence_catalog": [
+        {
+          "evidence_id": "POL-A:2.1",
+          "document_id": "POL-A",
+          "version": "1",
+          "locator": "2.1",
+          "title": "Synthetic trigger rule",
+          "text": "A scenario may enter validation only after trigger classification is verified.",
+          "redistributable": true
+        },
+        {
+          "evidence_id": "POL-B:4.3",
+          "document_id": "POL-B",
+          "version": "2",
+          "locator": "4.3",
+          "title": "Synthetic evidence rule",
+          "text": "A verified trigger classification requires an approved evidence record before validation.",
+          "redistributable": true
+        }
+      ],
+      "gold_evidence_ids": ["POL-A:2.1", "POL-B:4.3"],
+      "notes": "Synthetic multi-hop example."
+    },
+    {
+      "id": "synthetic-unanswerable-001",
+      "question": "What numerical threshold applies to Scenario B?",
+      "scenario": "The available synthetic corpus contains no numerical threshold.",
+      "task_type": "unanswerable",
+      "answerable": false,
+      "gold_answer": null,
+      "minimum_hops": 0,
+      "evidence_catalog": [
+        {
+          "evidence_id": "POL-C:1.0",
+          "document_id": "POL-C",
+          "version": "1",
+          "locator": "1.0",
+          "title": "Synthetic scope statement",
+          "text": "Scenario B requires review, but this document does not define a numerical threshold.",
+          "redistributable": true
+        }
+      ],
+      "gold_evidence_ids": ["POL-C:1.0"],
+      "notes": "Tests abstention rather than hallucinated thresholds."
+    }
+  ]
+}
