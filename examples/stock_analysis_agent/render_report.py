@@ -7,6 +7,10 @@ import json
 from pathlib import Path
 
 
+def display(value, suffix: str = "") -> str:
+    return "N/A" if value is None else f"{value}{suffix}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--status", choices=["complete", "insufficient_evidence"], required=True)
@@ -47,13 +51,13 @@ def main() -> None:
         "",
         "## 市场数据",
         "",
-        f"- 最新收盘：{features['price']['latest_close']}",
-        f"- 区间涨跌：{features['price']['period_return_pct']}%",
-        f"- MA5 / MA10 / MA20：{features['price']['ma5']} / {features['price']['ma10']} / {features['price']['ma20']}",
-        f"- 最新成交量：{features['volume']['latest']}",
-        f"- 近5日成交量相对前5日：{features['volume']['recent5_vs_previous5_pct']}%",
-        f"- 最新换手率：{features['turnover']['latest_pct']}%",
-        f"- 近5日换手率相对前5日：{features['turnover']['recent5_vs_previous5_pct']}%",
+        f"- 最新收盘：{display(features['price']['latest_close'])}",
+        f"- 区间涨跌：{display(features['price']['period_return_pct'], '%')}",
+        f"- MA5 / MA10 / MA20：{display(features['price']['ma5'])} / {display(features['price']['ma10'])} / {display(features['price']['ma20'])}",
+        f"- 最新成交量：{display(features['volume']['latest'])}",
+        f"- 近5日成交量相对前5日：{display(features['volume']['recent5_vs_previous5_pct'], '%')}",
+        f"- 最新换手率：{display(features['turnover']['latest_pct'], '%')}",
+        f"- 近5日换手率相对前5日：{display(features['turnover']['recent5_vs_previous5_pct'], '%')}",
         "",
         "## 最近新闻",
         "",
