@@ -3,12 +3,23 @@
 > **Skills that run, pause, think, and continue.**  
 > **让 Skill 不再只是“告诉 Agent 怎么做”，而是让 Agent 真正进入程序执行流。**
 
-Looma 是一个面向 **Coding Agent** 的 Python Runtime / Skill Framework。
+Looma 是 **Agent-Embedded Programming（AEP，智能体嵌入式编程）** 的 Python Runtime / Skill Framework。
 
-它尝试定义一种不同于传统 Skill、也不同于传统 LLM Workflow Framework 的新范式：
+**Agent-Embedded Programming** 是 Looma 正式采用的范式名称：
 
-> **Executable Skill / Resumable Skill**  
-> Skill 不再只是 Markdown 中的说明和提示词，而可以拥有真正的程序控制流、循环、状态、函数调用、暂停与恢复能力。
+> **把宿主 Agent 作为一种可暂停、可恢复的智能计算单元，直接嵌入普通程序控制流。**
+
+在 AEP 中，Python 继续拥有 `if`、`for`、`while`、函数调用和异常处理等程序控制权；Codex、Claude Code、SDW 等宿主 Coding Agent 提供语义理解、分析、判断、规划和 Review 等智能能力；Looma Runtime 负责两者之间的 suspend、state、replay、resume 与边界协议。
+
+Looma 同时把 **Executable Skill（可执行 Skill）** 定义为 AEP 的 Skill 封装形式：
+
+```text
+Agent-Embedded Programming = 编程范式
+Executable Skill           = Skill 封装形式
+Looma                      = Python Runtime / Framework
+```
+
+Skill 因此不再只是 Markdown 中的说明和提示词，而可以拥有真正的程序控制流、循环、状态、函数调用、暂停与恢复能力。
 
 使用 Looma，你可以继续用普通 Python 编写 `if`、`for`、`while`、函数和脚本，只在真正需要智能判断的位置插入：
 
@@ -144,9 +155,11 @@ Looma 的设计是：
 
 ---
 
-# A New Skill Paradigm
+# Agent-Embedded Programming
 
-Looma 把 Skill 从“说明文档”推进到“可执行能力”。
+Looma 把 **Agent-Embedded Programming（AEP）** 作为核心编程范式，把 Agent 从“程序外部的模型服务”变成“程序内部可恢复的智能计算单元”。
+
+在 AEP 上，Looma 再把 Skill 从“说明文档”推进到“可执行能力”。
 
 可以把它理解为三代形态：
 
@@ -154,7 +167,7 @@ Looma 把 Skill 从“说明文档”推进到“可执行能力”。
 |---|---|---|---|
 | Traditional Skill | Prompt / Markdown / SOP | 宿主 Agent | 主要由 Agent 自己理解 |
 | LLM Workflow Framework | Graph / Agent Framework / Orchestrator | 应用自己的 LLM API | Framework 控制 |
-| **Looma Executable Skill** | **Skill + Python Runtime + Boundary Contract** | **宿主 Coding Agent** | **普通 Python 控制** |
+| **AEP + Looma Executable Skill** | **Skill + Python Runtime + Boundary Contract** | **宿主 Coding Agent** | **普通 Python 控制** |
 
 Looma 的目标不是替代 Codex、Claude Code 或 SDW。
 
@@ -634,6 +647,21 @@ return Review(...)
 
 # Installation
 
+## Install the published wheel
+
+V0.1 wheel 已直接发布到仓库，可无需 clone 安装：
+
+```bash
+pip install https://raw.githubusercontent.com/datanger/Looma/main/releases/v0.1.0/looma_runtime-0.1.0-py3-none-any.whl
+```
+
+安装后：
+
+```bash
+looma status
+looma skill-path
+```
+
 ## Development install
 
 ```bash
@@ -685,7 +713,7 @@ Looma 本身同时提供：
 
 ```text
 src/looma/skills/
-└── llm-driven-programmatic-coding/
+└── agent-embedded-programming/
     └── SKILL.md
 ```
 
@@ -709,7 +737,7 @@ Host Agent execution rules
 
 因此 Looma Skill 更接近：
 
-> **Executable Agent Skill Specification**
+> **Agent-Embedded Programming Skill / Executable Skill Specification**
 
 宿主 Coding Agent 不仅知道“应该怎么做”，还知道：
 
@@ -928,6 +956,8 @@ Looma 的核心并不是：
 而是：
 
 > **让已经存在的 Agent 成为程序的一部分。**
+
+这也是 **Agent-Embedded Programming** 的核心定义。
 
 不是：
 
