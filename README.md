@@ -81,7 +81,7 @@ Looma 当前支持普通 Python 分支与循环、多次 Agent 调用、多脚�
 ## Install
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.2/looma_runtime-0.1.2-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.3/looma_runtime-0.1.3-py3-none-any.whl
 ```
 
 验证安装：
@@ -167,7 +167,7 @@ try AKShare 获取真实行情
 
 ## Status
 
-最新发布版本：**v0.1.2 / experimental**。`main` 分支包含尚未发布的 stock-analysis Agent 与文档改进。
+最新发布版本：**v0.1.3 / experimental**。
 
 CI 覆盖 Python 3.10、3.11、3.12、3.13，并验证 process restart、loop、多 Agent、多脚本、result schema guard、resume guard、run isolation 与 wheel 安装。
 
