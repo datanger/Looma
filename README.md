@@ -723,6 +723,7 @@ return Review(...)
 | `examples/batch_review.py` | 批量数据审核 | `for each → step → agent → collect` |
 | `examples/generate_validate.py` | Agent 生成 + 程序校验 | `agent edits artifact → deterministic validation → loop` |
 | `examples/multi_script_workflow/` | 多脚本 Workflow | `collect.py → transform.py → agent → report.py` |
+| `examples/multi_stage_agent_workflow/` | 多阶段 Agent/Script Workflow | `prepare.py → Agent → analyze.py → Agent → gate.py → summary/detailed` |
 
 例如代码修复场景保持普通 Python 的流程控制：
 
