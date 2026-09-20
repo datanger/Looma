@@ -29,6 +29,20 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip build
       - run: python -m build --wheel
+      - name: Verify wheel contents and installed skill
+        shell: bash
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          python - <<'PY'
+          from importlib.resources import files
+          import looma
+          assert looma.__version__ == "0.1.0"
+          skill = files("looma").joinpath("skills", "agent-embedded-programming", "SKILL.md")
+          assert skill.is_file(), skill
+          text = skill.read_text(encoding="utf-8")
+          assert "Agent-Embedded Programming" in text
+          print(skill)
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: looma-wheel
