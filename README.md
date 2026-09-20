@@ -561,6 +561,64 @@ output.result_file
 
 这使 Agent / Script 边界保持简单、稳定、可机器校验。
 
+## Guarded agent2script validation
+
+`expected_output` 不只是提示信息，而是 **恢复命令契约**。
+
+Looma 会对 Agent 返回的 `agent2script` 做严格校验：
+
+```text
+actual.script == expected_output.script
+actual.args   == expected_output.args
+actual.keys   == {"script", "args"}
+```
+
+只有完全一致时，命令才允许执行。
+
+推荐由宿主 / 执行器把 Agent 的最终 JSON 保存为文件，并通过：
+
+```bash
+looma handoff \
+  --request .looma/runs/<run-id>/events/<event>-script2agent.json \
+  --response agent2script.json
+```
+
+完成校验和恢复。
+
+如果 Agent 返回了不同脚本、不同参数、额外字段，或者 Agent result 尚未写入，Looma：
+
+```text
+1. 不执行 Agent 返回的命令
+2. 返回 exit code 76
+3. 输出 <<<AGENT2SCRIPT_ERROR>>> 结构化错误
+4. 错误中同时给出 expected_output 与 actual_output
+5. 宿主应把该错误反馈给同一个 Agent，让 Agent 修正后重试
+```
+
+例如 Agent 错误返回：
+
+```json
+{
+  "script": "/usr/bin/python3",
+  "args": ["/project/other.py"]
+}
+```
+
+而期待的是：
+
+```json
+{
+  "script": "/usr/bin/python3",
+  "args": ["/project/main.py"]
+}
+```
+
+则 `other.py` **不会被执行**。
+
+对于通过校验的命令，Looma 还会从 workflow state 中恢复原始 `cwd` 后再执行，从而尽可能回到原 workflow 的原始运行上下文。
+
+> 注意：真正的强制校验点是 Looma handoff / Host Adapter。若某个宿主绕过 handoff，直接自行执行 Agent 返回的任意命令，Runtime 无法在命令执行之前拦截它。因此 AEP Skill 要求宿主把所有 agent2script 执行统一经过该校验点。
+
 ---
 
 # Core API
@@ -655,10 +713,10 @@ return Review(...)
 
 ## Install the published wheel
 
-V0.1 wheel 已直接发布到仓库，可无需 clone 安装：
+V0.1.1 wheel 已直接发布到仓库，可无需 clone 安装：
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.0/looma_runtime-0.1.0-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.1/looma_runtime-0.1.1-py3-none-any.whl
 ```
 
 安装后：
@@ -687,13 +745,13 @@ python -m build --wheel
 生成：
 
 ```text
-dist/looma_runtime-0.1.0-py3-none-any.whl
+dist/looma_runtime-0.1.1-py3-none-any.whl
 ```
 
 安装：
 
 ```bash
-pip install dist/looma_runtime-0.1.0-py3-none-any.whl
+pip install dist/looma_runtime-0.1.1-py3-none-any.whl
 ```
 
 GitHub Actions 会自动：
