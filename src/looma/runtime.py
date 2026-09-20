@@ -266,7 +266,11 @@ def workflow_decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
             print(REQUEST_END)
             print(f"LOOMA_REQUEST_FILE={suspended.request_file}")
             raise SystemExit(SUSPEND_EXIT_CODE)
-        except SystemExit:
+        except SystemExit as exc:
+            if exc.code in (None, 0):
+                runtime.complete()
+            else:
+                runtime.fail(exc)
             raise
         except BaseException as exc:
             runtime.fail(exc)
