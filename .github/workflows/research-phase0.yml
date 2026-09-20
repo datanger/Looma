@@ -24,12 +24,12 @@ jobs:
       - name: Contract fault injection
         run: |
           mkdir -p research-results
-          python experiments/reliability_faults.py \
+          python -m experiments.reliability_faults \
             --output research-results/reliability.json
 
       - name: Runtime scaling smoke benchmark
         run: |
-          python experiments/runtime_scaling.py \
+          python -m experiments.runtime_scaling \
             --events 10,100,1000 \
             --repeats 1 \
             --output research-results/runtime-scaling.json
