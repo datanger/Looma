@@ -6,6 +6,9 @@ import shutil
 from importlib.resources import files
 from pathlib import Path
 
+from .exceptions import Agent2ScriptValidationError
+from .handoff import AGENT2SCRIPT_VALIDATION_EXIT_CODE, execute_validated_agent2script, format_agent2script_error
+
 
 def _root(value: str | None) -> Path:
     return Path(value or ".looma").resolve()
@@ -51,6 +54,17 @@ def cmd_skill_path(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_handoff(args: argparse.Namespace) -> int:
+    try:
+        return execute_validated_agent2script(
+            request_file=args.request,
+            response_file=args.response,
+        )
+    except Agent2ScriptValidationError as exc:
+        print(format_agent2script_error(exc))
+        return AGENT2SCRIPT_VALIDATION_EXIT_CODE
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="looma")
     parser.add_argument("--state-dir", default=None, help="State directory (default: .looma)")
@@ -68,6 +82,14 @@ def main() -> int:
         help="Print the bundled Agent-Embedded Programming Skill path",
     )
     p_skill.set_defaults(func=cmd_skill_path)
+
+    p_handoff = sub.add_parser(
+        "handoff",
+        help="Validate agent2script against expected_output, then resume the workflow",
+    )
+    p_handoff.add_argument("--request", required=True, help="Path to the persisted script2agent JSON")
+    p_handoff.add_argument("--response", required=True, help="Path to the Agent-returned agent2script JSON")
+    p_handoff.set_defaults(func=cmd_handoff)
 
     args = parser.parse_args()
     return args.func(args)
