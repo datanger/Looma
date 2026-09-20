@@ -1017,10 +1017,10 @@ def repair_until_green(repo, max_attempts=3):
 
 ## Install the published wheel
 
-V0.1.1 wheel 已直接发布到仓库，可无需 clone 安装：
+V0.1.2 wheel 已直接发布到仓库，可无需 clone 安装：
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.1/looma_runtime-0.1.1-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.2/looma_runtime-0.1.2-py3-none-any.whl
 ```
 
 安装后：
@@ -1049,13 +1049,13 @@ python -m build --wheel
 生成：
 
 ```text
-dist/looma_runtime-0.1.1-py3-none-any.whl
+dist/looma_runtime-0.1.2-py3-none-any.whl
 ```
 
 安装：
 
 ```bash
-pip install dist/looma_runtime-0.1.1-py3-none-any.whl
+pip install dist/looma_runtime-0.1.2-py3-none-any.whl
 ```
 
 GitHub Actions 会自动：
