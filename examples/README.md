@@ -1,7 +1,9 @@
 # Looma example
 
-Looma intentionally keeps **one integrated example** instead of many small demos:
+Looma intentionally keeps **one integrated example**:
 
-- [repair_workflow/](repair_workflow/) — a host-native code-repair workflow that combines multiple scripts, durable replay, a repair loop, structured Agent results, and optional host-native subagent concurrency.
+- [stock_analysis_agent/](stock_analysis_agent/) — a short-term stock analysis Agent that combines AKShare market-data scripts, recent-news web research, deterministic evidence checks, a research loop, structured Agent results, and optional host-native subagent concurrency.
 
-The example is designed to show the AEP programming model as one meaningful end-to-end task rather than a collection of isolated API snippets.
+The default target is **宇树科技 (688836)**, but the workflow accepts another A-share name/code.
+
+The example is deliberately split into small workflow stages so that code owns deterministic data processing while the current host Agent owns web research and semantic analysis.
