@@ -36,7 +36,7 @@ jobs:
           python - <<'PY'
           from importlib.resources import files
           import looma
-          assert looma.__version__ == "0.1.0"
+          assert looma.__version__ == "0.1.1"
           skill = files("looma").joinpath("skills", "agent-embedded-programming", "SKILL.md")
           assert skill.is_file(), skill
           text = skill.read_text(encoding="utf-8")
