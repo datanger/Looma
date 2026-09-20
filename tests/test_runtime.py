@@ -135,3 +135,163 @@ def test_skill_is_packaged():
     assert "script2agent" in text
     assert "agent2script" in text
     assert "same-command replay/resume" in text
+
+
+def test_agent2script_exact_match_validation():
+    from looma import validate_agent2script
+
+    expected = {
+        "script": "/usr/bin/python3",
+        "args": ["/project/main.py", "--input", "data.json"],
+    }
+    actual = {
+        "script": "/usr/bin/python3",
+        "args": ["/project/main.py", "--input", "data.json"],
+    }
+
+    assert validate_agent2script(actual, expected) == expected
+
+
+def test_agent2script_mismatch_is_rejected():
+    import pytest
+    from looma import Agent2ScriptValidationError, validate_agent2script
+
+    expected = {
+        "script": "/usr/bin/python3",
+        "args": ["/project/main.py"],
+    }
+    actual = {
+        "script": "/usr/bin/python3",
+        "args": ["/project/other.py"],
+    }
+
+    with pytest.raises(Agent2ScriptValidationError) as exc_info:
+        validate_agent2script(actual, expected)
+
+    error = exc_info.value.as_dict()
+    assert error["error"] == "agent2script_validation_error"
+    assert error["expected_output"] == expected
+    assert error["actual_output"] == actual
+    assert any(item["field"] == "args" for item in error["mismatches"])
+
+
+def test_agent2script_extra_fields_are_rejected():
+    import pytest
+    from looma import Agent2ScriptValidationError, validate_agent2script
+
+    expected = {"script": "python", "args": ["main.py"]}
+    actual = {
+        "script": "python",
+        "args": ["main.py"],
+        "reasoning": "I changed nothing",
+    }
+
+    with pytest.raises(Agent2ScriptValidationError):
+        validate_agent2script(actual, expected)
+
+
+def test_guarded_handoff_does_not_execute_mismatched_command(tmp_path: Path):
+    from looma.handoff import execute_validated_agent2script
+    from looma import Agent2ScriptValidationError
+
+    run_dir = tmp_path / "runs" / "run-1"
+    events_dir = run_dir / "events"
+    events_dir.mkdir(parents=True)
+
+    sentinel = tmp_path / "should-not-exist.txt"
+    expected_script = tmp_path / "expected.py"
+    wrong_script = tmp_path / "wrong.py"
+
+    expected_script.write_text("print('expected')", encoding="utf-8")
+    wrong_script.write_text(
+        f"from pathlib import Path; Path({str(sentinel)!r}).write_text('executed')",
+        encoding="utf-8",
+    )
+
+    result_file = events_dir / "0000-agent-result.json"
+    result_file.write_text('{"ok": true}', encoding="utf-8")
+
+    request_file = events_dir / "0000-script2agent.json"
+    request_file.write_text(
+        json.dumps(
+            {
+                "output": {"result_file": str(result_file)},
+                "expected_output": {
+                    "script": sys.executable,
+                    "args": [str(expected_script)],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "state.json").write_text(
+        json.dumps({"invocation": {"cwd": str(tmp_path)}}),
+        encoding="utf-8",
+    )
+
+    response_file = tmp_path / "agent2script.json"
+    response_file.write_text(
+        json.dumps(
+            {
+                "script": sys.executable,
+                "args": [str(wrong_script)],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        execute_validated_agent2script(
+            request_file=request_file,
+            response_file=response_file,
+        )
+        raise AssertionError("mismatched agent2script should have been rejected")
+    except Agent2ScriptValidationError:
+        pass
+
+    assert not sentinel.exists(), "A mismatched Agent command must never be executed"
+
+
+def test_guarded_handoff_executes_only_validated_command(tmp_path: Path):
+    from looma.handoff import execute_validated_agent2script
+
+    run_dir = tmp_path / "runs" / "run-1"
+    events_dir = run_dir / "events"
+    events_dir.mkdir(parents=True)
+
+    sentinel = tmp_path / "executed.txt"
+    script = tmp_path / "resume_target.py"
+    script.write_text(
+        f"from pathlib import Path; Path({str(sentinel)!r}).write_text('ok')",
+        encoding="utf-8",
+    )
+
+    result_file = events_dir / "0000-agent-result.json"
+    result_file.write_text('{"ok": true}', encoding="utf-8")
+
+    expected = {"script": sys.executable, "args": [str(script)]}
+    request_file = events_dir / "0000-script2agent.json"
+    request_file.write_text(
+        json.dumps(
+            {
+                "output": {"result_file": str(result_file)},
+                "expected_output": expected,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "state.json").write_text(
+        json.dumps({"invocation": {"cwd": str(tmp_path)}}),
+        encoding="utf-8",
+    )
+
+    response_file = tmp_path / "agent2script.json"
+    response_file.write_text(json.dumps(expected), encoding="utf-8")
+
+    code = execute_validated_agent2script(
+        request_file=request_file,
+        response_file=response_file,
+    )
+
+    assert code == 0
+    assert sentinel.read_text(encoding="utf-8") == "ok"
