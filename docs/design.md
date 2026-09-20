@@ -187,6 +187,31 @@ A Coding Agent host such as Codex, Claude Code or SDW is responsible for:
 
 The host may optimize execution internally, but that must not change Looma's program semantics.
 
+## Recoverable capability fallback
+
+External dependencies are allowed to fail without collapsing the AEP model. A deterministic `step()` can return a structured recoverable failure; the next `agent()` boundary can ask the **current host** to use its native tools to obtain sourced real evidence.
+
+```text
+step(): provider attempt
+        │
+        ├─ ready → deterministic processing
+        └─ recoverable failure
+                ↓
+             agent()
+                ↓
+      current host native tools
+                ↓
+        sourced real evidence
+                ↓
+       step(): validate / accept
+                │
+                ├─ pass → continue
+                └─ fail → retry / insufficient / fail
+```
+
+This does not turn Looma into an HTTP client, browser, or Agent launcher. The host still owns semantic research and tool use; the program owns the retry bound and any acceptance criteria that can be made deterministic.
+
+Live fallbacks must not fabricate, interpolate, or synthesize missing business facts merely to satisfy a schema. Provenance should be retained when the workflow depends on externally acquired evidence. Fixtures and mocks are appropriate for deterministic CI control-flow tests, but must remain clearly separated from live workflow evidence.
 ## Observability
 
 `looma status` lists local runs.
