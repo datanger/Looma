@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "looma-runtime"
+version = "0.1.0"
+description = "Replay-based Python runtime that lets coding agents participate in ordinary Python control flow through script2agent/agent2script handoffs."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "datanger"}]
+keywords = ["agents", "workflow", "durable-execution", "codex", "python"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.scripts]
+looma = "looma.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+looma = ["skills/**/*.md"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
