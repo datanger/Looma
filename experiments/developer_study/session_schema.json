@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AEP Developer Study Session",
+  "type": "object",
+  "required": [
+    "participant_id",
+    "task_id",
+    "method",
+    "started_at",
+    "ended_at",
+    "elapsed_seconds",
+    "tests_passed",
+    "implementation_sloc",
+    "debug_iterations",
+    "documentation_lookups",
+    "external_help_events",
+    "sus_responses"
+  ],
+  "properties": {
+    "participant_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "method": {
+      "type": "string",
+      "enum": [
+        "direct_sdk",
+        "langgraph",
+        "microsoft_agent_framework",
+        "looma"
+      ]
+    },
+    "started_at": {"type": "string"},
+    "ended_at": {"type": "string"},
+    "elapsed_seconds": {"type": "number", "minimum": 0},
+    "tests_passed": {"type": "boolean"},
+    "implementation_sloc": {"type": "integer", "minimum": 0},
+    "debug_iterations": {"type": "integer", "minimum": 0},
+    "documentation_lookups": {"type": "integer", "minimum": 0},
+    "external_help_events": {"type": "integer", "minimum": 0},
+    "framework_errors": {"type": "integer", "minimum": 0},
+    "notes": {"type": "string"},
+    "sus_responses": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {"type": "integer", "minimum": 1, "maximum": 5}
+    }
+  },
+  "additionalProperties": false
+}
