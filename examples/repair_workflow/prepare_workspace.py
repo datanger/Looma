@@ -12,6 +12,12 @@ HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "template"
 
 
+def bump_counter(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    count = int(path.read_text(encoding="utf-8")) if path.exists() else 0
+    path.write_text(str(count + 1), encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workdir", required=True)
@@ -20,6 +26,7 @@ def main() -> None:
     workdir = Path(args.workdir).resolve()
     repo = workdir / "project"
     workdir.mkdir(parents=True, exist_ok=True)
+    bump_counter(workdir / ".counts" / "prepare.txt")
 
     created = False
     if not repo.exists():
