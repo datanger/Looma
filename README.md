@@ -54,11 +54,14 @@ Looma 当前围绕 AEP 提供以下能力：
 | **多轮 Agent Workflow** | 一个 Workflow 中可以多次 `agent(...)`，支持循环、分支和多阶段流程 |
 | **多脚本 Workflow** | 可以编排已有独立 Python 脚本/工具，不需要把工程重写成单文件 |
 | **严格 Resume Contract** | `agent2script` 必须与 `expected_output` 完全一致，否则拒绝执行 |
-| **Result Guard** | Agent 业务结果必须先写入 `output.result_file` 且为合法 JSON，才允许恢复 |
+| **Result Schema Guard** | Agent 业务结果必须先写入 `output.result_file`，并通过 `output.output_schema` 结构校验，才允许恢复 |
 | **Host-native Subagent / 并发** | 程序只描述可并行任务；subagent、并发调度和汇总完全由宿主原生实现 |
 | **Host-independent Boundary** | Looma 不依赖某个模型 API；Codex、Claude Code、SDW 等宿主可按同一边界语义工作 |
 | **Executable Skill** | Wheel 内置 AEP Skill，告诉宿主如何处理 suspend、task、result 和 resume |
-| **可测试的持久化执行** | 已有 process restart、loop、多 Agent、多脚本、resume guard 等自动化测试 |
+| **Workflow Inspect** | `looma status` 查看运行列表，`looma inspect` 查看 event history 与待处理 Agent Contract |
+| **独立 Workflow Instance** | 使用 `LOOMA_RUN_KEY` 隔离同一启动命令的多个逻辑实例 |
+| **Atomic Durable State** | 状态与 event JSON 使用原子替换写入，降低进程中断造成状态文件损坏的风险 |
+| **可测试的持久化执行** | 已有 process restart、loop、多 Agent、多脚本、schema guard、resume guard、instance isolation 等自动化测试 |
 
 其中并发能力尤其需要注意：
 
@@ -1220,11 +1223,32 @@ AEP 本身并不限定具体 Runtime、编程语言或边界协议。**Looma 是
             └── 0001-agent-result.json
 ```
 
-查看：
+查看运行列表：
 
 ```bash
 looma status
 ```
+
+查看最新一次 Workflow 的完整状态、event history 和 pending Agent Contract：
+
+```bash
+looma inspect
+```
+
+查看指定 run：
+
+```bash
+looma inspect <run-id>
+```
+
+如果同一个 Python 启动命令需要同时存在多个独立逻辑实例，可以给每个实例设置不同的：
+
+```bash
+LOOMA_RUN_KEY=job-a python main.py
+LOOMA_RUN_KEY=job-b python main.py
+```
+
+`LOOMA_RUN_KEY` 只用于区分 durable run，不参与 Agent 执行策略。同一个 run key 仍表示同一个逻辑 Workflow。
 
 清理：
 
@@ -1300,23 +1324,51 @@ same-command resumes
 workflow completion
 ```
 
+当前还已经实现并测试：
+
+```text
+Agent result schema validation
+strict agent2script resume validation
+workflow status / inspect
+atomic durable-state writes
+failed-run pointer cleanup
+LOOMA_RUN_KEY instance isolation
+multi-script workflow
+multi-stage Agent / Script workflow
+```
+
 ---
 
-# Roadmap
+# Current scope
 
-接下来重点包括：
+此前 Roadmap 中已经有明确价值、且与 Looma 核心职责一致的项目已经进入当前实现：
 
-- Host-native integration contract：让 Codex / SDW / Claude Code 等宿主更自然地消费 `script2agent`，但不由 Looma 启动 Agent
-- 更严格的 Agent result schema 校验
-- Workflow history / inspect
-- Retry / failure policies
-- Concurrent workflow instances
-- Pluggable state store
-- Durable distributed backend
-- 更丰富的 Step primitive
-- 更完整的 Skill packaging / discovery
-- Host-native subagent / concurrency task conventions
-- 更好的 observability
+- Host-native contract 已固化到 AEP Skill 与 `script2agent / agent2script` 协议；
+- Agent result schema 校验已经在 handoff 前强制执行，Runtime replay 也有第二层校验；
+- Workflow history / observability 已通过 `looma status` 和 `looma inspect` 提供；
+- 独立 Workflow instance 已通过 `LOOMA_RUN_KEY` 隔离；
+- Skill packaging / discovery 已通过 wheel 内置 Skill 和 `looma skill-path` 提供；
+- Host-native subagent / concurrency conventions 已写入 Skill，且明确由宿主实现。
+
+以下项目不再作为当前 Roadmap，因为它们要么会模糊 Looma 与宿主的职责，要么在没有真实需求前属于过度设计：
+
+```text
+generic hidden retry engine
+custom Agent parallel/spawn/join runtime
+pluggable state-store abstraction
+durable distributed scheduler/backend
+vague “richer step primitives”
+```
+
+失败重试应该优先使用普通 Python 循环或宿主对 Contract Validation Error 的修正重试；Agent 并发继续由宿主原生实现。分布式状态或新的 Step primitive 只有在出现明确、可测试的 AEP 用例时再引入。
+
+因此当前 Looma 不维护一个为了“看起来完整”而堆积功能的长期清单。新增能力需要同时满足三个条件：
+
+```text
+解决真实 AEP 用例
+不破坏 Host-native 边界
+能够通过进程级自动化测试验证
+```
 
 ---
 
