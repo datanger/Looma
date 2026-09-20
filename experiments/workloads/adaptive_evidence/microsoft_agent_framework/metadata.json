@@ -1,0 +1,7 @@
+{
+  "label": "Microsoft Agent Framework functional workflow",
+  "count_files": ["workflow.py"],
+  "framework_version": "1.19.0",
+  "framework_constructs": ["@workflow", "build()", "run()", "WorkflowRunResult"],
+  "fixture_mode_note": "Phase-1 isolates orchestration with the shared semantic backend; model-client/Agent wiring is evaluated separately."
+}

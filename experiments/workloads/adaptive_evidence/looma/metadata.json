@@ -1,0 +1,7 @@
+{
+  "label": "AEP / Looma",
+  "count_files": ["workflow.py"],
+  "excluded_harness_files": ["host_driver.py"],
+  "framework_constructs": ["@workflow", "step()", "agent()"],
+  "fixture_mode_note": "host_driver.py only simulates the external Host for deterministic CI and is excluded from application LOC."
+}

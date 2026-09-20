@@ -1,0 +1,88 @@
+[
+  {
+    "id": "normal",
+    "question": "Should release R-17 be approved under the supplied policy evidence?",
+    "requirements": {"minimum_evidence": 2, "require_authoritative_source": true},
+    "sources": [
+      {"id": "policy-v3", "available": true, "authoritative": true, "content": "Policy v3 requires score >= 80 and a signed review."},
+      {"id": "review-R17", "available": true, "authoritative": false, "content": "Release R-17 has score 86 and a signed review."},
+      {"id": "notes", "available": true, "authoritative": false, "content": "Informal notes mention no additional blocker."}
+    ],
+    "oracle": {"expected_decision": "approve", "supporting_source_ids": ["policy-v3", "review-R17"]},
+    "fixture": {
+      "research_rounds": [["policy-v3", "review-R17"]],
+      "analysis_rounds": [
+        {"decision": "approve", "cited_source_ids": ["policy-v3", "review-R17"], "rationale": "The score and signed-review requirements are both satisfied.", "needs_revision": false}
+      ]
+    }
+  },
+  {
+    "id": "primary_unavailable",
+    "question": "Should release R-18 be approved when the preferred policy source is unavailable?",
+    "requirements": {"minimum_evidence": 2, "require_authoritative_source": true},
+    "sources": [
+      {"id": "policy-primary", "available": false, "authoritative": true, "content": "Unavailable primary source."},
+      {"id": "policy-mirror", "available": true, "authoritative": true, "content": "Verified policy mirror: score >= 80 and a signed review are required."},
+      {"id": "review-R18", "available": true, "authoritative": false, "content": "Release R-18 has score 84 and a signed review."}
+    ],
+    "oracle": {"expected_decision": "approve", "supporting_source_ids": ["policy-mirror", "review-R18"]},
+    "fixture": {
+      "research_rounds": [["policy-primary", "review-R18"], ["policy-mirror", "review-R18"]],
+      "analysis_rounds": [
+        {"decision": "approve", "cited_source_ids": ["policy-mirror", "review-R18"], "rationale": "The verified mirror and signed review satisfy the release rule.", "needs_revision": false}
+      ]
+    }
+  },
+  {
+    "id": "conflicting_sources",
+    "question": "Should release R-19 be approved when an outdated note conflicts with the current policy?",
+    "requirements": {"minimum_evidence": 2, "require_authoritative_source": true},
+    "sources": [
+      {"id": "policy-v4", "available": true, "authoritative": true, "content": "Current policy v4 requires score >= 82 and a signed review."},
+      {"id": "old-note", "available": true, "authoritative": false, "content": "Outdated note says a score >= 90 is required."},
+      {"id": "review-R19", "available": true, "authoritative": false, "content": "Release R-19 has score 85 and a signed review."}
+    ],
+    "oracle": {"expected_decision": "approve", "supporting_source_ids": ["policy-v4", "review-R19"]},
+    "fixture": {
+      "research_rounds": [["policy-v4", "old-note", "review-R19"]],
+      "analysis_rounds": [
+        {"decision": "approve", "cited_source_ids": ["old-note"], "rationale": "Initial answer used the wrong source.", "needs_revision": false},
+        {"decision": "approve", "cited_source_ids": ["policy-v4", "review-R19"], "rationale": "The authoritative current policy takes precedence over the outdated note.", "needs_revision": false}
+      ]
+    }
+  },
+  {
+    "id": "missing_expected_source",
+    "question": "Should release R-20 be approved when the first evidence path points to a missing source?",
+    "requirements": {"minimum_evidence": 2, "require_authoritative_source": true},
+    "sources": [
+      {"id": "policy-v3", "available": true, "authoritative": true, "content": "Policy v3 requires score >= 80 and a signed review."},
+      {"id": "review-missing", "available": false, "authoritative": false, "content": "Missing review artifact."},
+      {"id": "audit-R20", "available": true, "authoritative": false, "content": "Audit record confirms score 81 and a signed review for R-20."}
+    ],
+    "oracle": {"expected_decision": "approve", "supporting_source_ids": ["policy-v3", "audit-R20"]},
+    "fixture": {
+      "research_rounds": [["policy-v3", "review-missing"], ["policy-v3", "audit-R20"]],
+      "analysis_rounds": [
+        {"decision": "approve", "cited_source_ids": ["policy-v3", "audit-R20"], "rationale": "The audit record supplies the missing release evidence.", "needs_revision": false}
+      ]
+    }
+  },
+  {
+    "id": "insufficient",
+    "question": "Should release R-21 be approved when no valid signed-review evidence exists?",
+    "requirements": {"minimum_evidence": 2, "require_authoritative_source": true},
+    "sources": [
+      {"id": "policy-v3", "available": true, "authoritative": true, "content": "Policy v3 requires score >= 80 and a signed review."},
+      {"id": "score-R21", "available": true, "authoritative": false, "content": "Release R-21 has score 91."},
+      {"id": "review-missing", "available": false, "authoritative": false, "content": "Signed review is unavailable."}
+    ],
+    "oracle": {"expected_decision": "insufficient", "supporting_source_ids": ["policy-v3", "score-R21"]},
+    "fixture": {
+      "research_rounds": [["policy-v3", "score-R21", "review-missing"], ["policy-v3", "score-R21"]],
+      "analysis_rounds": [
+        {"decision": "insufficient", "cited_source_ids": ["policy-v3", "score-R21"], "rationale": "The score is sufficient but the required signed review is not evidenced.", "needs_revision": false}
+      ]
+    }
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "label": "Direct SDK / hand-written loop",
+  "count_files": ["workflow.py"],
+  "framework_constructs": ["application-owned semantic backend", "explicit retry loops"],
+  "fixture_mode_note": "Uses the shared deterministic semantic backend for orchestration equivalence; real model-client wiring is a later controlled experiment."
+}

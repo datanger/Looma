@@ -1,0 +1,2 @@
+langgraph==1.2.11
+agent-framework-core==1.19.0

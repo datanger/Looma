@@ -1,0 +1,44 @@
+name: research-phase1
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "experiments/workloads/adaptive_evidence/**"
+      - "experiments/code_metrics.py"
+      - "experiments/requirements-phase1.txt"
+      - ".github/workflows/research-phase1.yml"
+
+jobs:
+  controlled-w1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e .
+      - run: python -m pip install -r experiments/requirements-phase1.txt
+
+      - name: Run W1 controlled fixture benchmark
+        run: |
+          mkdir -p research-results
+          python -m experiments.workloads.adaptive_evidence.run_phase1 \
+            --repeats 1 \
+            --output research-results/w1-fixture.json
+
+      - name: Measure orchestration SLOC
+        run: |
+          python -m experiments.code_metrics \
+            direct=experiments/workloads/adaptive_evidence/direct_sdk/workflow.py \
+            langgraph=experiments/workloads/adaptive_evidence/langgraph/workflow.py \
+            microsoft_agent_framework=experiments/workloads/adaptive_evidence/microsoft_agent_framework/workflow.py \
+            looma=experiments/workloads/adaptive_evidence/looma/workflow.py \
+            --output research-results/w1-code-metrics.json
+
+      - name: Preserve Phase-1 results
+        uses: actions/upload-artifact@v4
+        with:
+          name: aep-phase1-w1-results
+          path: research-results/*.json

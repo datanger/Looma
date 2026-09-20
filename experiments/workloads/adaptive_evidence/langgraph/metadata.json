@@ -1,0 +1,7 @@
+{
+  "label": "LangGraph StateGraph",
+  "count_files": ["workflow.py"],
+  "framework_version": "1.2.11",
+  "framework_constructs": ["StateGraph", "state schema", "nodes", "edges", "conditional edges", "compile/invoke"],
+  "fixture_mode_note": "Semantic results come from the same deterministic backend as every other implementation."
+}
