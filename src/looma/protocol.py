@@ -4,7 +4,7 @@ import types
 from collections.abc import Mapping as ABCMapping
 from dataclasses import MISSING, fields, is_dataclass
 from pathlib import Path
-from typing import Any, Literal, Mapping, Union, get_args, get_origin
+from typing import Any, Literal, Mapping, Union, get_args, get_origin, get_type_hints
 
 FIXED_PROMPT = (
     "通用说明：script 表示产生输入数据的脚本来源；output 表示脚本实际产生的数据或产物路径；"
@@ -85,9 +85,14 @@ def describe_schema(schema: Any) -> Any:
     if isinstance(schema, type) and is_dataclass(schema):
         properties: dict[str, Any] = {}
         required: list[str] = []
+        try:
+            type_hints = get_type_hints(schema)
+        except Exception:
+            type_hints = {}
 
         for field in fields(schema):
-            properties[field.name] = _annotation_schema(field.type)
+            annotation = type_hints.get(field.name, field.type)
+            properties[field.name] = _annotation_schema(annotation)
             if field.default is MISSING and field.default_factory is MISSING:
                 required.append(field.name)
 
