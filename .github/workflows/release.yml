@@ -30,7 +30,7 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Verify package version
+      - name: Verify source versions
         shell: bash
         run: |
           PACKAGE_VERSION="$(python - <<'PY'
@@ -39,8 +39,22 @@ jobs:
               print(tomllib.load(f)["project"]["version"])
           PY
           )"
+          RUNTIME_VERSION="$(python - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path("src/looma/__init__.py").read_text(encoding="utf-8")
+          match = re.search(r'^__version__\s*=\s*"([^"]+)"', text, re.MULTILINE)
+          if not match:
+              raise SystemExit("src/looma/__init__.py has no __version__")
+          print(match.group(1))
+          PY
+          )"
           if [ "$PACKAGE_VERSION" != "${{ steps.version.outputs.version }}" ]; then
             echo "pyproject.toml version ($PACKAGE_VERSION) does not match release/VERSION (${{ steps.version.outputs.version }})" >&2
+            exit 1
+          fi
+          if [ "$RUNTIME_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "looma.__version__ source ($RUNTIME_VERSION) does not match release/VERSION (${{ steps.version.outputs.version }})" >&2
             exit 1
           fi
 
@@ -48,6 +62,30 @@ jobs:
       - run: python -m pip install -e .
       - run: pytest
       - run: python -m build --wheel
+
+      - name: Verify built wheel before release
+        shell: bash
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          looma --help >/dev/null
+          looma inspect --help >/dev/null
+          python - <<'PY'
+          from importlib.metadata import version
+          from importlib.resources import files
+          import looma
+
+          expected = "${{ steps.version.outputs.version }}"
+          metadata_version = version("looma-runtime")
+          assert metadata_version == expected, (metadata_version, expected)
+          assert looma.__version__ == expected, (looma.__version__, expected)
+
+          skill = files("looma").joinpath("skills", "agent-embedded-programming", "SKILL.md")
+          assert skill.is_file(), skill
+          text = skill.read_text(encoding="utf-8")
+          assert "Agent-Embedded Programming" in text
+          assert "外部能力失败与真实数据 fallback" in text
+          print(skill)
+          PY
 
       - name: Create GitHub Release and upload wheel
         uses: softprops/action-gh-release@v2
