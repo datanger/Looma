@@ -9,7 +9,7 @@ The experiment design is defined in [../research/PAPER_PLAN.md](../research/PAPE
 ### Contract fault injection
 
 ```bash
-python experiments/reliability_faults.py \
+python -m experiments.reliability_faults \
   --output experiments/results/reliability.json
 ```
 
@@ -22,7 +22,7 @@ The benchmark evaluates the contracts Looma currently implements. It does **not*
 Quick run:
 
 ```bash
-python experiments/runtime_scaling.py \
+python -m experiments.runtime_scaling \
   --events 10,100,1000 \
   --repeats 3 \
   --output experiments/results/runtime-scaling.json
@@ -31,7 +31,7 @@ python experiments/runtime_scaling.py \
 A larger 10k-event point should be run separately because current state persistence/replay may make it substantially slower:
 
 ```bash
-python experiments/runtime_scaling.py \
+python -m experiments.runtime_scaling \
   --events 10000 \
   --repeats 3 \
   --output experiments/results/runtime-scaling-10k.json
@@ -44,7 +44,7 @@ Agent output is deterministic in this microbenchmark. This isolates Looma proces
 Use functionally equivalent implementations with shared business logic kept outside each framework-specific implementation directory.
 
 ```bash
-python experiments/code_metrics.py \
+python -m experiments.code_metrics \
   looma=experiments/workloads/adaptive_evidence/looma \
   direct=experiments/workloads/adaptive_evidence/direct_sdk \
   langgraph=experiments/workloads/adaptive_evidence/langgraph \
