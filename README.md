@@ -129,31 +129,27 @@ Agent/subagent 的推理、工具调用、并发调度与结果汇总都属于�
 
 ## Example
 
-仓库只保留一个完整案例：[examples/repair_workflow/](examples/repair_workflow/)。
+仓库只保留一个完整案例：[examples/stock_analysis_agent/](examples/stock_analysis_agent/)。
 
-它实现一个有实际意义的 **代码修复闭环**：
+它实现一个短期股票分析 Agent：
 
 ```text
-跨脚本准备 workspace
+AKShare 获取 K线 / 成交量 / 换手率
         ↓
-跨脚本运行测试
+代码计算市场特征
         ↓
-测试失败
+宿主 Agent 上网检索最近几日新闻
         ↓
-agent(...) 把修复任务交回当前宿主
+代码检查证据完整性
         ↓
-宿主可使用 native subagents 并发分析
+宿主可用 native subagents 并行分析
         ↓
-宿主修改代码
+证据不足则定向补充研究并循环
         ↓
-resume / replay
-        ↓
-Python 循环再次运行测试
-        ↓
-通过后跨脚本生成最终报告
+生成最终分析报告
 ```
 
-这个单一案例同时覆盖 multi-script、loop、多次 Agent boundary、durable replay、结构化结果校验和 Host-native subagent concurrency。
+这个案例同时展示 multi-script、loop、多次 Agent boundary、structured result、durable replay 和 Host-native subagent concurrency。
 
 ## Documentation
 
