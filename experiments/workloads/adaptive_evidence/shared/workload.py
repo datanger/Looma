@@ -83,6 +83,10 @@ def validate_analysis(public: dict[str, Any], evidence: dict[str, Any], analysis
     unknown = sorted({item for item in cited if item not in allowed_ids})
     if unknown:
         problems.append(f"analysis cites sources not present in accepted evidence: {unknown}")
+    sources = source_map(public)
+    if public["requirements"].get("require_authoritative_source"):
+        if not any(sources.get(source_id, {}).get("authoritative") for source_id in cited):
+            problems.append("analysis must cite at least one authoritative source")
     if analysis.get("decision") not in {"approve", "reject", "insufficient"}:
         problems.append("analysis decision is invalid")
     if not isinstance(analysis.get("rationale"), str) or not analysis["rationale"].strip():
