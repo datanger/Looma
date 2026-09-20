@@ -588,8 +588,9 @@ agent boundary
 same-command replay/resume
 multiple Agent calls
 for / while / branching
-multi-script workflow
-multi-stage Agent / Script workflow
+integrated repair workflow with cross-script execution
+repair loop with multiple Agent boundaries
+host-native subagent concurrency task description
 result schema validation
 strict resume validation
 workflow status / inspect
@@ -659,7 +660,7 @@ Regression coverage should include, where applicable:
 - process restart / resume；
 - step side-effect deduplication；
 - loops and multiple Agent calls；
-- multi-script / multi-stage execution；
+- integrated repair workflow：cross-script execution + repair loop + multiple Agent boundaries；
 - invalid result schema rejection；
 - invalid `agent2script` rejection；
 - direct-resume defense；
@@ -678,5 +679,5 @@ A Runtime feature is not complete until its restart/replay semantics are tested.
 - `README.md` — project overview and quick start
 - `docs/agent-embedded-programming.md` — AEP paradigm
 - `docs/design.md` — runtime design
-- `examples/README.md` — reusable workflow examples
+- `examples/repair_workflow/README.md` — the single integrated example: cross-script repair loop with host-native subagent concurrency
 - `src/looma/skills/agent-embedded-programming/SKILL.md` — host-facing executable Skill
