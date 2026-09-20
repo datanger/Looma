@@ -1,0 +1,41 @@
+name: research-phase0
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "experiments/**"
+      - "research/**"
+      - ".github/workflows/research-phase0.yml"
+
+jobs:
+  phase0:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e .
+
+      - name: Contract fault injection
+        run: |
+          mkdir -p research-results
+          python experiments/reliability_faults.py \
+            --output research-results/reliability.json
+
+      - name: Runtime scaling smoke benchmark
+        run: |
+          python experiments/runtime_scaling.py \
+            --events 10,100,1000 \
+            --repeats 1 \
+            --output research-results/runtime-scaling.json
+
+      - name: Preserve research results
+        uses: actions/upload-artifact@v4
+        with:
+          name: aep-phase0-results
+          path: research-results/*.json
