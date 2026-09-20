@@ -28,14 +28,19 @@ python examples/multi_stage_agent_workflow/workflow.py \
   --workdir /tmp/looma-multi-stage
 ```
 
-For a real Codex-hosted end-to-end run, use:
+## Host-native execution
+
+Run this example **from inside the already-running Coding Agent host session**. Looma must not start Codex, Claude Code, SDW, or any subagent through a CLI, SDK, API, or subprocess.
+
+The host Agent uses its own native terminal to start the workflow:
 
 ```bash
-python examples/multi_stage_agent_workflow/run_with_codex.py
+LOOMA_STATE_DIR=/tmp/looma-multi-stage-state \\
+PYTHONPATH=src \\
+python examples/multi_stage_agent_workflow/workflow.py \\
+  --workdir /tmp/looma-multi-stage
 ```
 
-That helper starts a single `codex exec --sandbox workspace-write` session and instructs Codex to act as the Looma host: run the workflow, consume each `script2agent`, write the business result, return exactly `expected_output`, pass it through `looma handoff`, and continue until the workflow exits successfully.
+When Looma emits `script2agent`, the Python process has returned a task description to the same host Agent. The host then performs that task using its native capabilities. If the task can be split, the host may use its own subagent functionality and concurrency. Looma does not participate in that scheduling.
 
-The default work directory is repo-local `.looma-codex-e2e/` so it remains writable under Codex's workspace-write sandbox. The runner uses `PYTHONPATH=src`, so an editable install is not required for this repository-level E2E test.
-
-No LLM API client is embedded in the workflow itself; Codex remains the external host Agent.
+After the host writes `output.result_file` and produces the required `agent2script`, the command is validated and the original workflow resumes.
