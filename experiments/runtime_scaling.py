@@ -36,7 +36,7 @@ def main():
         step(identity, i)
     result = agent(
         task="Return a deterministic benchmark acknowledgement.",
-        input={{"events": {events}}},
+        input={"events": {events}},
         output_schema=dict,
     )
     print("BENCHMARK_DONE", result["ok"])
@@ -50,7 +50,7 @@ def run_once(events: int) -> dict:
         root = Path(raw)
         state_dir = root / "state"
         script = root / "workflow.py"
-        script.write_text(SCRIPT_TEMPLATE.format(events=events), encoding="utf-8")
+        script.write_text(SCRIPT_TEMPLATE.replace("{events}", str(events)), encoding="utf-8")
         env = looma_env(state_dir)
 
         started = time.perf_counter()
