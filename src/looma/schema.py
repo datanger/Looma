@@ -89,12 +89,23 @@ def _validate(value: Any, schema: Any, *, path: str, root: Any, errors: list[dic
                         errors=errors,
                     )
 
-            if schema.get("additionalProperties") is False:
-                allowed_names = set(properties.keys())
+            additional = schema.get("additionalProperties")
+            allowed_names = set(properties.keys())
+            if additional is False:
                 for name in value:
                     if name not in allowed_names:
                         errors.append(
                             {"path": f"{path}.{name}", "reason": "additional_property"}
+                        )
+            elif isinstance(additional, Mapping):
+                for name, item in value.items():
+                    if name not in allowed_names:
+                        _validate(
+                            item,
+                            additional,
+                            path=f"{path}.{name}",
+                            root=root,
+                            errors=errors,
                         )
 
     if isinstance(value, list):
