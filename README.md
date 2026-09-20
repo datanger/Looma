@@ -303,46 +303,118 @@ while ...:
 
 ---
 
-## AEP 的核心思路：让宿主 Agent 成为程序的一部分
+## AEP 的核心思路：程序执行与宿主智能之间的控制权交接
 
-> **并发属于宿主执行策略，而不是 Looma Runtime 语义。**  
-> 如果一个 `script2agent.task` 描述了多个相互独立的子任务，程序返回的是“请宿主完成这些任务”的说明。宿主是否使用 subagent、启动多少个 subagent、是否并发、如何隔离 workspace、如何汇总结果，都由当前宿主自身决定。Looma 不调用任何 Agent CLI / SDK / API 来实现这些能力。
+AEP 的核心不是“程序调用一个 Agent 服务”，而是：
 
+> **程序在需要智能能力的位置主动让出控制权，把一个任务说明交还给当前宿主 Agent；宿主完成任务后，再把结果交回程序继续执行。**
 
-AEP 的抽象结构是：
+因此，AEP 最重要的不是某个具体 API，而是一次可恢复的 **control handoff**：
 
 ```text
-                 Python Program
-                      │
-             deterministic code
-                      │
-                  agent(...)
-                      │
-                      ▼
-             script2agent boundary
-                      │
-                      ▼
-      Codex / Claude Code / SDW / ...
-             existing host agent
-                      │
-                      ▼
-             agent2script boundary
-                      │
-                      ▼
-              same Python command
-                      │
-                      ▼
-               replay / resume
-                      │
-                      ▼
-              continue Python
+┌──────────────────────── Existing Coding Agent Host ────────────────────────┐
+│                                                                            │
+│  reasoning / tools / terminal / context / subagents / concurrency         │
+│                                                                            │
+│        ① start / continue program                                          │
+│                    │                                                       │
+│                    ▼                                                       │
+│        ┌───────────────────────────────┐                                   │
+│        │        Program Runtime        │                                   │
+│        │                               │                                   │
+│        │  deterministic code           │                                   │
+│        │  if / for / while / function  │                                   │
+│        │             │                 │                                   │
+│        │             ▼                 │                                   │
+│        │        Agent Boundary         │                                   │
+│        └─────────────┬─────────────────┘                                   │
+│                      │                                                     │
+│          ② yield Task Contract                                             │
+│                      │                                                     │
+│                      ▼                                                     │
+│        ┌───────────────────────────────┐                                   │
+│        │       Host-native Work        │                                   │
+│        │                               │                                   │
+│        │  understand / reason / edit   │                                   │
+│        │  use tools                    │                                   │
+│        │  optional native subagents    │                                   │
+│        │  optional parallel execution  │                                   │
+│        └─────────────┬─────────────────┘                                   │
+│                      │                                                     │
+│          ③ materialize Result Contract                                     │
+│                      │                                                     │
+│          ④ satisfy Resume Contract                                         │
+│                      │                                                     │
+│                      ▼                                                     │
+│        ┌───────────────────────────────┐                                   │
+│        │        Program Runtime        │                                   │
+│        │   validate → resume → next    │                                   │
+│        └───────────────────────────────┘                                   │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
-也就是说：
+这套结构中有三个不同的契约：
 
-> **程序拥有流程控制权，宿主 Coding Agent 提供智能，Runtime 负责把两者连接起来。**
+```text
+Task Contract
+    程序告诉宿主：
+    “现在需要你完成什么任务、输入是什么、结果应满足什么结构”
 
-Looma 是这一结构的一种 Python 实现。
+Result Contract
+    宿主告诉程序：
+    “任务已经完成，这是符合要求的业务结果”
+
+Resume Contract
+    Runtime 确认：
+    “下一步应该恢复哪个原程序执行路径”
+```
+
+控制权会在两种执行状态之间来回切换：
+
+```text
+Program owns workflow control
+        │
+        │ reaches Agent Boundary
+        ▼
+Host owns task execution
+        │
+        │ task completed
+        ▼
+Program regains workflow control
+        │
+        └── continue / branch / loop / finish
+```
+
+这里尤其要注意：
+
+> **并发属于 Host-native Work，而不是 Program Runtime。**
+
+程序只返回任务说明，例如“这三个子任务彼此独立，可以并行”。当前宿主是否创建 subagent、创建多少个、是否并行、如何隔离 workspace、如何 gather，全部属于宿主自己的执行策略。
+
+AEP 本身并不限定 Python、`script2agent`、`agent2script` 或 replay 实现。
+
+Looma 只是把这个抽象映射成一套具体 Python Runtime：
+
+```text
+AEP abstract concept           Looma implementation
+──────────────────────────     ─────────────────────────────
+Program Runtime                @workflow / step()
+Agent Boundary                 agent()
+Task Contract                  script2agent
+Result Contract                output.result_file
+Resume Contract                expected_output
+Resume validation              guarded agent2script
+Program continuation           same-command replay / resume
+Host-native execution          existing Codex / Claude Code / SDW session
+Host-native concurrency        host subagents / host scheduler
+```
+
+所以更准确地说：
+
+> **程序拥有 Workflow 控制流；宿主拥有智能任务的执行权；Runtime 只负责在两者之间建立可验证、可恢复的控制权交接。**
+
+Looma 是这一 AEP 抽象的一种 Python 实现。
 
 ---
 
