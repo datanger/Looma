@@ -15,7 +15,10 @@ AEP 中：
 - Codex、Claude Code、SDW 等宿主 Coding Agent 负责分析、判断、规划、Review 和其它语义推理；
 - Looma Runtime 负责 suspend、state、replay、resume；
 - Script 与 Agent 之间仍使用 `script2agent` / `agent2script` 两类极简交接协议；
-- 业务 Workflow **不直接配置或调用 LLM API**。模型、会话、上下文和工具权限由宿主 Agent 提供。
+- 业务 Workflow **不直接配置或调用 LLM API**。模型、会话、上下文和工具权限由宿主 Agent 提供；
+- Looma **不启动 Agent，也不启动 subagent**，不调用 Codex / Claude Code / SDW 的 CLI、SDK 或 API；
+- `agent(...)` 只负责生成一份给当前宿主 Agent 执行的任务说明并暂停程序；
+- subagent、并发执行、任务调度、workspace 隔离与结果汇总全部由当前宿主 Agent 原生完成。
 
 Looma 是 AEP 的 Python Runtime；**Executable Skill（可执行 Skill）** 是 AEP 的 Skill 封装形式。
 
@@ -114,9 +117,9 @@ decision = agent(
 )
 ```
 
-第一次运行到这里时 Looma 不直接调用模型，而是生成 `script2agent`、持久化状态并暂停当前进程。
+第一次运行到这里时 Looma 不调用模型、Agent CLI、Agent SDK 或 subagent 接口，而是生成 `script2agent`、持久化状态并暂停当前进程。
 
-宿主 Agent 完成任务、写入结果文件并执行 `agent2script` 后，原命令重新运行；Looma replay 到同一位置，此时 `agent()` 像普通函数一样返回。
+`script2agent.task` 本质上是**返回给当前宿主 Agent 的任务说明**。宿主 Agent 在自己的原生环境内决定如何完成任务：可以自己执行，也可以调用宿主原生 subagent 并发处理多个独立子任务。完成后宿主写入结果文件并恢复原命令；Looma replay 到同一位置，此时 `agent()` 像普通函数一样返回。
 
 ## 5. 推荐代码形态
 
@@ -153,6 +156,55 @@ def optimize(config):
 保持普通 Python 的控制结构。不要把整个 Workflow 改写成自定义 Graph DSL，除非业务确实需要另一套调度系统。
 
 ## 6. 宿主 Agent 收到 script2agent 后必须怎么做
+
+### 6.1 并发与 subagent 的归属
+
+并发执行完全属于 **Host Coding Agent**。
+
+Looma / Workflow 只负责返回任务说明，例如：
+
+```python
+result = agent(
+    task="""
+    请检查 security、performance、tests 三个彼此独立的方向。
+    如果当前宿主支持 subagent，可并发执行。
+    全部完成后汇总为一个结构化结果。
+    """,
+    input={"repo": "."},
+    output_schema=ReviewResult,
+)
+```
+
+其语义是：
+
+```text
+Python / Looma
+    ↓
+script2agent.task
+    ↓
+当前 Host Agent
+    ├─ 可自己顺序执行
+    └─ 可使用宿主原生 subagents 并发执行
+            ↓
+          gather
+            ↓
+      写一个 result_file
+            ↓
+       resume workflow
+```
+
+严格禁止把它实现成：
+
+```text
+Looma → codex CLI
+Looma → Claude CLI
+Looma → Agent SDK
+Looma → LLM API
+Looma → subprocess 启动另一个 Agent
+```
+
+Looma 不规定宿主内部的并发实现细节，也不要求所有宿主都支持 subagent。任务本身必须在串行执行时仍然保持正确；支持 subagent 的宿主可以把并发作为加速策略。
+
 
 Looma 暂停时会：
 
@@ -366,6 +418,8 @@ looma skill-path
 - 判断；
 - 规划；
 - Review；
+- 按宿主自身能力创建 / 调度 subagent；
+- 在宿主内部执行并发任务并汇总；
 - 写入结构化 Agent result；
 - 按 `expected_output` 触发下一次脚本执行。
 
@@ -383,6 +437,8 @@ looma skill-path
 不要：
 
 - 在 Looma Workflow 里重新创建一套 OpenAI/Anthropic LLM Client；
+- 从 Looma / Workflow 中调用 Codex、Claude Code、SDW 的 CLI / SDK / API；
+- 从 Looma / Workflow 中启动 subagent；
 - 把 Looma 变成第二个宿主 Agent；
 - 为每次 `agent()` 创建新的 resume 脚本；
 - 把 Agent 业务结果放进 `agent2script`；
