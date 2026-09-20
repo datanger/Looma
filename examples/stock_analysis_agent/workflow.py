@@ -83,8 +83,12 @@ def news_to_dict(value: NewsResearch) -> dict:
 
 
 def merge_news(base: NewsResearch, supplement: NewsResearch) -> NewsResearch:
-    merged = {}
-    for item in [*base.items, *supplement.items]:
+    base_dict = news_to_dict(base)
+    supplement_dict = news_to_dict(supplement)
+
+    merged: dict[str, NewsItem] = {}
+    for raw in [*base_dict["items"], *supplement_dict["items"]]:
+        item = raw if isinstance(raw, NewsItem) else NewsItem(**raw)
         key = item.url or f"{item.published_at}:{item.title}"
         merged[key] = item
 
