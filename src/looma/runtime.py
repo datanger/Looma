@@ -19,6 +19,7 @@ CURRENT_RUNTIME: ContextVar["WorkflowRuntime | None"] = ContextVar("looma_runtim
 SUSPEND_EXIT_CODE = 75
 REQUEST_BEGIN = "<<<SCRIPT2AGENT>>>"
 REQUEST_END = "<<<END_SCRIPT2AGENT>>>"
+ACTIVE_STATUSES = {"running", "waiting_agent"}
 
 
 @dataclass(frozen=True)
@@ -26,16 +27,31 @@ class Invocation:
     script: str
     args: list[str]
     cwd: str
+    run_key: str | None = None
 
     @classmethod
     def capture(cls) -> "Invocation":
         # Re-running Python with the original argv is semantically equivalent to
         # the original Python script invocation and avoids exposing a resume helper.
         argv0 = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] else sys.argv[0]
-        return cls(script=sys.executable, args=[argv0, *sys.argv[1:]], cwd=os.getcwd())
+        raw_run_key = os.environ.get("LOOMA_RUN_KEY")
+        run_key = raw_run_key.strip() if raw_run_key and raw_run_key.strip() else None
+        return cls(
+            script=sys.executable,
+            args=[argv0, *sys.argv[1:]],
+            cwd=os.getcwd(),
+            run_key=run_key,
+        )
 
     def fingerprint(self) -> str:
-        return json_hash({"script": self.script, "args": self.args, "cwd": self.cwd})[:20]
+        return json_hash(
+            {
+                "script": self.script,
+                "args": self.args,
+                "cwd": self.cwd,
+                "run_key": self.run_key,
+            }
+        )[:20]
 
 
 class WorkflowRuntime:
@@ -66,13 +82,17 @@ class WorkflowRuntime:
     def _load_or_create_run(self) -> tuple[str, dict]:
         pointer = self.active_pointer
         if pointer.exists():
-            ref = load_json(pointer)
-            run_id = ref["run_id"]
-            state_path = self.runs_dir / run_id / "state.json"
-            if state_path.exists():
-                state = load_json(state_path)
-                if state.get("status") != "completed":
-                    return run_id, state
+            try:
+                ref = load_json(pointer)
+                run_id = ref["run_id"]
+                state_path = self.runs_dir / run_id / "state.json"
+                if state_path.exists():
+                    state = load_json(state_path)
+                    if state.get("status") in ACTIVE_STATUSES:
+                        return run_id, state
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                # A stale/corrupt pointer must never make a new workflow unusable.
+                pass
 
         run_id = uuid.uuid4().hex
         state = {
@@ -84,6 +104,7 @@ class WorkflowRuntime:
                 "script": self.invocation.script,
                 "args": self.invocation.args,
                 "cwd": self.invocation.cwd,
+                "run_key": self.invocation.run_key,
             },
             "status": "running",
             "events": [],
@@ -97,16 +118,27 @@ class WorkflowRuntime:
     def save(self) -> None:
         dump_json(self.state_file, self.state)
 
+    def _release_active_pointer(self) -> None:
+        if not self.active_pointer.exists():
+            return
+        try:
+            ref = load_json(self.active_pointer)
+        except Exception:
+            self.active_pointer.unlink(missing_ok=True)
+            return
+        if ref.get("run_id") == self.run_id:
+            self.active_pointer.unlink(missing_ok=True)
+
     def complete(self) -> None:
         self.state["status"] = "completed"
         self.save()
-        if self.active_pointer.exists():
-            self.active_pointer.unlink()
+        self._release_active_pointer()
 
     def fail(self, error: BaseException) -> None:
         self.state["status"] = "failed"
         self.state["error"] = f"{type(error).__name__}: {error}"
         self.save()
+        self._release_active_pointer()
 
     def _caller_key(self, kind: str) -> str:
         frame = inspect.currentframe()
@@ -173,11 +205,13 @@ class WorkflowRuntime:
         if event is not None:
             persisted_result = Path(event["result_file"])
             if persisted_result.exists():
+                result = load_json(persisted_result)
+                coerced = coerce_result(result, output_schema)
                 if event.get("status") != "completed":
                     event["status"] = "completed"
                     self.state["status"] = "running"
                     self.save()
-                return coerce_result(load_json(persisted_result), output_schema)
+                return coerced
             # Re-emitting the same request is idempotent if resume was triggered too early.
             request = load_json(Path(event["request_file"]))
             raise WorkflowSuspend(request, str(event["request_file"]))
