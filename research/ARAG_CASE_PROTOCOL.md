@@ -62,8 +62,18 @@ Start with:
 2. HotpotQA
 3. 2WikiMultiHopQA
 
-A small development subset is used first. Full benchmark runs start only after
-the execution and logging protocol is frozen.
+The public A-RAG dataset repository is pinned to revision:
+
+```text
+Ayanami0730/rag_test
+b9198a5a8702cc35c6df7542529357a9af95d928
+```
+
+The first controlled development set is a deterministic 100-question subset
+from each dataset. `prepare_public_data.py` downloads exactly the pinned
+`questions.json` and `chunks.json` files, freezes the subset by SHA-256
+ranking of question ids, and records content hashes. Full benchmark runs start
+only after the development protocol is stable.
 
 ## Outputs
 
@@ -195,3 +205,19 @@ If both inputs already contain A-RAG `llm_accuracy` fields, it also reports the
 paired LLM-accuracy delta.
 
 These utilities intentionally do not invent missing LLM-judge scores.
+
+## Public-data preparation
+
+The reproducible data-preparation command is:
+
+```bash
+python -m experiments.case_studies.arag_host_native.prepare_public_data \
+  --revision b9198a5a8702cc35c6df7542529357a9af95d928 \
+  --subset-size 100 \
+  --seed aep-paper-v1 \
+  --output-root research-data/arag
+```
+
+CI workflow `research-arag-data.yml` executes the same command and preserves
+the manifest, full chunks/questions files, and deterministic dev100 subsets as
+a research artifact. The upstream files are not committed into Looma.
