@@ -9,3 +9,4 @@ dist/
 .looma/
 .DS_Store
 .looma-codex-e2e/
+experiments/results/
