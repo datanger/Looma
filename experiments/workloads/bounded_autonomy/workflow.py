@@ -11,6 +11,29 @@ from experiments.workloads.bounded_autonomy.environment import (
 from experiments.workloads.bounded_autonomy.validator import validate_result
 
 
+AGENT_INPUT_SCHEMA = {
+    "type": "object",
+    "required": [
+        "scenario",
+        "scenario_id",
+        "round",
+        "environment_module",
+        "previous_validation_problems",
+    ],
+    "properties": {
+        "scenario": {"type": "object"},
+        "scenario_id": {"type": "string"},
+        "round": {"type": "integer"},
+        "environment_module": {"type": "string"},
+        "previous_validation_problems": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "additionalProperties": False,
+}
+
+
 RESULT_SCHEMA = {
     "type": "object",
     "required": ["decision", "cited_source_ids", "tool_path", "rationale"],
@@ -60,6 +83,7 @@ def run_scenario(scenario_id: str, max_rounds: int = 3):
                 ),
                 "previous_validation_problems": check["problems"],
             },
+            input_schema=AGENT_INPUT_SCHEMA,
             output_schema=RESULT_SCHEMA,
         )
         check = step(validate_result, scenario_id, result)

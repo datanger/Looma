@@ -34,7 +34,10 @@ question
           → keyword_search / semantic_search / read_chunk
 ```
 
-The bridge is deterministic and contains no model client.
+The bridge is deterministic and contains no model client. The Host-native batch
+Workflow now declares an explicit Agent `input_schema` as well as an output
+schema, so malformed benchmark/task context is rejected before suspension and
+malformed Agent results are rejected before resume.
 
 ## Controlled variables
 

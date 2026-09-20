@@ -12,6 +12,33 @@ from experiments.case_studies.arag_host_native.validate_answer import (
 )
 
 
+AGENT_INPUT_SCHEMA = {
+    "type": "object",
+    "required": [
+        "qid",
+        "question",
+        "round",
+        "config",
+        "session_file",
+        "bridge_module",
+        "previous_validation_problems",
+    ],
+    "properties": {
+        "qid": {"type": "string"},
+        "question": {"type": "string"},
+        "round": {"type": "integer"},
+        "config": {"type": "string"},
+        "session_file": {"type": "string"},
+        "bridge_module": {"type": "string"},
+        "previous_validation_problems": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "additionalProperties": False,
+}
+
+
 ANSWER_SCHEMA = {
     "type": "object",
     "required": [
@@ -130,6 +157,7 @@ def run_batch(
                     ),
                     "previous_validation_problems": check["problems"],
                 },
+                input_schema=AGENT_INPUT_SCHEMA,
                 output_schema=ANSWER_SCHEMA,
             )
             check = step(

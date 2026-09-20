@@ -6,10 +6,13 @@ These are engineering checkpoints, not final paper claims. Final tables require 
 
 The current fault-injection harness covers a valid control plus malformed/missing Agent results, schema violations, invalid resume output, and replay divergence. The first successful CI run observed:
 
-- 8/8 scenarios behaved as expected;
-- 7/7 invalid boundary cases were rejected;
+The current `main` run after adding optional Agent Input Contracts observed:
+
+- 9/9 scenarios behaved as expected;
+- 8/8 invalid boundary cases were rejected;
 - 0 false acceptances;
-- the valid control completed.
+- the valid control completed;
+- an invalid `input_schema` case failed before any `script2agent` request was emitted.
 
 This does not establish exactly-once side effects for a crash that occurs inside a side-effecting `step()` before durable persistence.
 
@@ -99,3 +102,21 @@ This is an integration result, not yet a MuSiQue/HotpotQA/2Wiki quality result.
 The benchmark utilities now also support deterministic subset freezing, run
 manifests with content hashes, paired bootstrap intervals, and exact McNemar
 tests for paired Contain-Match correctness.
+
+## Frozen public A-RAG development data
+
+CI run `35512896077`, commit
+`f8f6f08aa921bcf1b8efe7bf69ca6a0223a7a5b7`, successfully downloaded the
+public A-RAG benchmark repository at upstream revision
+`b9198a5a8702cc35c6df7542529357a9af95d928` and froze deterministic 100-item
+development subsets for all three primary datasets.
+
+| Dataset | Questions SHA-256 | Chunks SHA-256 | dev100 SHA-256 |
+|---|---|---|---|
+| MuSiQue | `42dfd487...` | `41d439ad...` | `5bd8b7a9...` |
+| HotpotQA | `ecc641d5...` | `cb76f6fd...` | `0255f230...` |
+| 2WikiMultiHopQA | `246e43fb...` | `e92b8bcf...` | `b94b2904...` |
+
+The exact full hashes and selected question ids are stored in the generated
+`manifest.json`. This freezes the first real A-RAG development evaluation set;
+no answer-quality comparison has been run yet.

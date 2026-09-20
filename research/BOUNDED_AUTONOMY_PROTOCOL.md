@@ -80,3 +80,11 @@ Every Host result is validated after the autonomous trajectory. The experiment
 therefore measures whether stronger local autonomy can coexist with deterministic
 boundary acceptance, rather than granting the Agent control of global program
 continuation.
+
+## Boundary contracts used by the implemented Workflow
+
+The current bounded-autonomy Workflow declares both an Agent `input_schema`
+and a structured result schema. Therefore the Host is free to change its internal
+tool path, but it cannot receive structurally malformed task context through the
+declared boundary, and its final result must satisfy the output contract before
+the deterministic scenario validator is applied.
