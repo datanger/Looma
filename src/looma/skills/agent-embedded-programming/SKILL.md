@@ -50,7 +50,7 @@ Looma 是 AEP 的 Python Runtime；**Executable Skill（可执行 Skill）** 是
 优先安装已发布 wheel：
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.1/looma_runtime-0.1.1-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.2/looma_runtime-0.1.2-py3-none-any.whl
 ```
 
 源码开发：
