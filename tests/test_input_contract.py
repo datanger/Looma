@@ -48,7 +48,7 @@ def test_runtime_rejects_invalid_agent_input_before_suspend(tmp_path: Path):
     assert runtime.state["events"] == []
 
 
-def test_script2agent_contains_declared_input_schema(tmp_path: Path, monkeypatch):
+def test_script2agent_contains_declared_input_schema(tmp_path: Path):
     script = tmp_path / "input_contract_demo.py"
     state_dir = tmp_path / "state"
     script.write_text(
@@ -59,7 +59,7 @@ INPUT_SCHEMA = {
     "type": "object",
     "required": ["query", "limit"],
     "properties": {
-        "query": {"type": "string"},
+        "query": {"type": "string", "minLength": 1},
         "limit": {"type": "integer"},
     },
     "additionalProperties": False,
