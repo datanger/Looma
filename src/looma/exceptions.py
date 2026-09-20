@@ -17,3 +17,26 @@ class ReplayMismatchError(LoomaError):
 
 class SerializationError(LoomaError):
     """Raised when a durable value cannot be serialized as JSON."""
+
+
+class Agent2ScriptValidationError(LoomaError):
+    """Raised when the agent2script response differs from expected_output."""
+
+    def __init__(self, message: str, *, expected=None, actual=None, mismatches=None):
+        super().__init__(message)
+        self.expected = expected
+        self.actual = actual
+        self.mismatches = list(mismatches or [])
+
+    def as_dict(self) -> dict:
+        return {
+            "error": "agent2script_validation_error",
+            "message": str(self),
+            "expected_output": self.expected,
+            "actual_output": self.actual,
+            "mismatches": self.mismatches,
+            "action": (
+                "Do not execute actual_output. Return exactly expected_output, "
+                "then retry validation."
+            ),
+        }
