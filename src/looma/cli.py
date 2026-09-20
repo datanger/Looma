@@ -46,7 +46,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
 
 
 def cmd_skill_path(args: argparse.Namespace) -> int:
-    skill = files("looma").joinpath("skills", "llm-driven-programmatic-coding", "SKILL.md")
+    skill = files("looma").joinpath("skills", "agent-embedded-programming", "SKILL.md")
     print(str(skill))
     return 0
 
@@ -63,7 +63,10 @@ def main() -> int:
     p_reset.add_argument("--yes", action="store_true")
     p_reset.set_defaults(func=cmd_reset)
 
-    p_skill = sub.add_parser("skill-path", help="Print the bundled coding-agent Skill path")
+    p_skill = sub.add_parser(
+        "skill-path",
+        help="Print the bundled Agent-Embedded Programming Skill path",
+    )
     p_skill.set_defaults(func=cmd_skill_path)
 
     args = parser.parse_args()
