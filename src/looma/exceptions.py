@@ -53,3 +53,13 @@ class AgentResultValidationError(Agent2ScriptValidationError):
         "Fix output.result_file so it satisfies output.output_schema. "
         "Do not resume the workflow until result validation passes."
     )
+
+    def as_dict(self) -> dict:
+        return {
+            "error": self.error_code,
+            "message": str(self),
+            "output_schema": self.expected,
+            "actual_result": self.actual,
+            "mismatches": self.mismatches,
+            "action": self.action,
+        }
