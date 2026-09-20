@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "looma-runtime"
 version = "0.1.0"
-description = "Replay-based Python runtime that lets coding agents participate in ordinary Python control flow through script2agent/agent2script handoffs."
+description = "Python runtime for Agent-Embedded Programming: embed host coding agents into ordinary resumable Python control flow without adding another LLM API client."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "datanger"}]
-keywords = ["agents", "workflow", "durable-execution", "codex", "python"]
+keywords = ["agent-embedded-programming", "agents", "workflow", "durable-execution", "codex", "python"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python :: 3",
@@ -19,6 +19,11 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 
+[project.urls]
+Homepage = "https://github.com/datanger/Looma"
+Repository = "https://github.com/datanger/Looma"
+Documentation = "https://github.com/datanger/Looma#readme"
+
 [project.scripts]
 looma = "looma.cli:main"
 
@@ -26,7 +31,7 @@ looma = "looma.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-looma = ["skills/**/*.md"]
+looma = ["skills/*/SKILL.md"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
