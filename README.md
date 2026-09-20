@@ -13,7 +13,7 @@ Looma                      = AEP 的一个 Python 实现
 
 AEP 的核心很简单：
 
-> **程序拥有控制流；宿主 Agent 提供智能；Runtime 负责暂停、恢复与持久化。**
+> **程序拥有控制流与验收条件；宿主 Agent 提供语义推理与证据获取；Runtime 负责暂停、恢复与持久化。**
 
 Looma 不启动新的 Agent，也不要求 Workflow 再配置一套 LLM API。  
 它直接复用当前已经存在的 Codex、Claude Code、SDW 或其他 Coding Agent 宿主。
@@ -134,34 +134,40 @@ Agent/subagent 的推理、工具调用、并发调度与结果汇总都属于�
 它实现一个短期股票分析 Agent：
 
 ```text
-AKShare 获取 K线 / 成交量 / 换手率
-        ↓
-代码计算市场特征
-        ↓
-宿主 Agent 上网检索最近几日新闻
-        ↓
-代码检查证据完整性
-        ↓
-宿主可用 native subagents 并行分析
-        ↓
-证据不足则定向补充研究并循环
-        ↓
-生成最终分析报告
+try AKShare 获取真实行情
+        │
+        ├─ success → 继续
+        │
+        └─ failure → 当前宿主联网补充有来源的真实行情
+                         ↓
+                  程序校验并保存
+                         ↓
+                 代码计算市场特征
+                         ↓
+             宿主 Agent 检索近期新闻
+                         ↓
+               程序执行 Evidence Gate
+                         ↓
+            宿主完成多维分析 / 可用 native subagents
+                         ↓
+               程序执行 Analysis Gate
+                         ↓
+          complete / insufficient_evidence
 ```
 
-这个案例同时展示 multi-script、loop、多次 Agent boundary、structured result、durable replay 和 Host-native subagent concurrency。
+这个案例同时展示 multi-script、loop、多次 Agent boundary、structured result、durable replay、真实数据 fallback、程序化 evidence/analysis gate，以及 Host-native subagent concurrency。Live fallback 明确禁止伪造行情；fixture 只用于确定性 CI。
 
 ## Documentation
 
 更完整的技术说明已从 README 移到：
 
-- [AGENT.md](AGENT.md) — Runtime、Host Contract、Replay、Result/Resume Contract、状态与开发约束
+- [AGENTS.md](AGENTS.md) — Codex 标准仓库指令；Runtime、Host Contract、Replay、Result/Resume Contract、状态与开发约束
 - [docs/agent-embedded-programming.md](docs/agent-embedded-programming.md) — AEP 编程范式
 - [docs/design.md](docs/design.md) — Looma Runtime 设计
 
 ## Status
 
-当前版本：**v0.1.2 / experimental**
+最新发布版本：**v0.1.2 / experimental**。`main` 分支包含尚未发布的 stock-analysis Agent 与文档改进。
 
 CI 覆盖 Python 3.10、3.11、3.12、3.13，并验证 process restart、loop、多 Agent、多脚本、result schema guard、resume guard、run isolation 与 wheel 安装。
 
