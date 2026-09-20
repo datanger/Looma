@@ -54,7 +54,8 @@ def build_script2agent(
         f"1. 使用 output.agent_input 作为本次 agent 调用的输入。\n"
         f"2. 将最终业务结果写入 `{result_file}`。该文件必须是 UTF-8 JSON。\n"
         f"3. 结果需满足 output.output_schema。\n"
-        "4. 写入结果后，不要把业务结果放进 agent2script；最终只返回 expected_output 指定的 script 和 args。"
+        "4. 写入结果后，不要把业务结果放进 agent2script；最终只返回 expected_output 指定的 script 和 args。\\n"
+        "5. agent2script 在执行前必须与 expected_output 严格校验；如不一致，不得执行该命令，应根据校验错误重新返回 expected_output。"
     )
     return {
         "script": {
