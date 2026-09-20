@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "looma-runtime"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python runtime for Agent-Embedded Programming: embed host coding agents into ordinary resumable Python control flow without adding another LLM API client."
 readme = "README.md"
 requires-python = ">=3.10"
