@@ -1,0 +1,72 @@
+[
+  {
+    "id": "normal",
+    "question": "Should R-31 be approved?",
+    "sources": [
+      {"id": "policy-primary", "kind": "policy", "available": true, "authoritative": true, "content": "Current policy requires score >= 80 and a signed review."},
+      {"id": "review-R31", "kind": "review", "available": true, "authoritative": false, "content": "R-31 has score 86 and a signed review."}
+    ],
+    "requirements": {"minimum_sources": 2, "required_kinds": ["policy", "review"], "require_authoritative": true},
+    "oracle": {"decision": "approve", "supporting_source_ids": ["policy-primary", "review-R31"]},
+    "static_route": ["policy-primary", "review-R31"]
+  },
+  {
+    "id": "primary_tool_unavailable",
+    "question": "Should R-32 be approved when the preferred policy source is unavailable?",
+    "sources": [
+      {"id": "policy-primary", "kind": "policy", "available": false, "authoritative": true, "content": "Unavailable."},
+      {"id": "policy-mirror", "kind": "policy", "available": true, "authoritative": true, "content": "Verified mirror of current policy: score >= 80 and signed review required."},
+      {"id": "review-R32", "kind": "review", "available": true, "authoritative": false, "content": "R-32 has score 84 and a signed review."}
+    ],
+    "requirements": {"minimum_sources": 2, "required_kinds": ["policy", "review"], "require_authoritative": true},
+    "oracle": {"decision": "approve", "supporting_source_ids": ["policy-mirror", "review-R32"]},
+    "static_route": ["policy-primary", "review-R32"]
+  },
+  {
+    "id": "renamed_authoritative_source",
+    "question": "Should R-33 be approved after the policy service was migrated?",
+    "sources": [
+      {"id": "regulatory-policy-v5", "kind": "policy", "available": true, "authoritative": true, "content": "Current policy requires score >= 82 and a signed review."},
+      {"id": "review-R33", "kind": "review", "available": true, "authoritative": false, "content": "R-33 has score 88 and a signed review."}
+    ],
+    "requirements": {"minimum_sources": 2, "required_kinds": ["policy", "review"], "require_authoritative": true},
+    "oracle": {"decision": "approve", "supporting_source_ids": ["regulatory-policy-v5", "review-R33"]},
+    "static_route": ["policy-primary", "review-R33"]
+  },
+  {
+    "id": "conflicting_stale_note",
+    "question": "Should R-34 be approved when a stale note conflicts with current policy?",
+    "sources": [
+      {"id": "policy-current", "kind": "policy", "available": true, "authoritative": true, "content": "Current policy requires score >= 82 and a signed review."},
+      {"id": "stale-note", "kind": "policy", "available": true, "authoritative": false, "content": "Old note requires score >= 95."},
+      {"id": "review-R34", "kind": "review", "available": true, "authoritative": false, "content": "R-34 has score 89 and a signed review."}
+    ],
+    "requirements": {"minimum_sources": 2, "required_kinds": ["policy", "review"], "require_authoritative": true},
+    "oracle": {"decision": "approve", "supporting_source_ids": ["policy-current", "review-R34"]},
+    "static_route": ["stale-note", "review-R34"]
+  },
+  {
+    "id": "missing_review_replaced_by_audit",
+    "question": "Should R-35 be approved when the normal review artifact is missing but an audit record is available?",
+    "sources": [
+      {"id": "policy-current", "kind": "policy", "available": true, "authoritative": true, "content": "Current policy requires score >= 80 and evidence of a signed review."},
+      {"id": "review-R35", "kind": "review", "available": false, "authoritative": false, "content": "Missing."},
+      {"id": "audit-R35", "kind": "review", "available": true, "authoritative": false, "content": "Audit record verifies score 83 and a signed review for R-35."}
+    ],
+    "requirements": {"minimum_sources": 2, "required_kinds": ["policy", "review"], "require_authoritative": true},
+    "oracle": {"decision": "approve", "supporting_source_ids": ["policy-current", "audit-R35"]},
+    "static_route": ["policy-current", "review-R35"]
+  },
+  {
+    "id": "insufficient_after_adaptation",
+    "question": "Should R-36 be approved when no signed-review evidence can be found?",
+    "sources": [
+      {"id": "policy-current", "kind": "policy", "available": true, "authoritative": true, "content": "Current policy requires score >= 80 and evidence of a signed review."},
+      {"id": "score-R36", "kind": "score", "available": true, "authoritative": false, "content": "R-36 has score 94."},
+      {"id": "review-R36", "kind": "review", "available": false, "authoritative": false, "content": "Missing."}
+    ],
+    "requirements": {"minimum_sources": 2, "required_kinds": ["policy", "review"], "require_authoritative": true},
+    "oracle": {"decision": "insufficient", "supporting_source_ids": ["policy-current"]},
+    "static_route": ["policy-current", "review-R36"]
+  }
+]

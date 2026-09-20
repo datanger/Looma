@@ -1,0 +1,27 @@
+name: research-autonomy
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "experiments/workloads/bounded_autonomy/**"
+      - "research/BOUNDED_AUTONOMY_PROTOCOL.md"
+      - ".github/workflows/research-autonomy.yml"
+
+jobs:
+  perturbation-sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e .
+      - name: Validate perturbation suite
+        run: |
+          mkdir -p research-results
+          python -m experiments.workloads.bounded_autonomy.sanity             --output research-results/bounded-autonomy-sanity.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aep-bounded-autonomy-sanity
+          path: research-results/bounded-autonomy-sanity.json
