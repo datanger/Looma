@@ -138,6 +138,7 @@ tests = step(run_tests, repo)
 review = agent(
     task="分析结果并决定下一步。",
     input=result,
+    input_schema={"type": "object"},
     output_schema=Review,
 )
 ```
@@ -155,7 +156,7 @@ review = agent(
 
 ## 4. Control handoff contracts
 
-AEP 在 Looma 中有三个契约。
+AEP 在 Looma 中把 Agent 边界拆成 Task / Input / Result / Resume Contract，并允许业务程序再增加 Acceptance Gate。
 
 ### Task Contract
 
@@ -169,6 +170,24 @@ AEP 在 Looma 中有三个契约。
 ```
 
 Looma 用 `script2agent` 表达。
+
+### Input Contract
+
+`agent(input_schema=...)` 是可选的输入契约。提供时，Runtime 会在 suspend 之前：
+
+```text
+normalize input to JSON-compatible data
+        ↓
+validate against input_schema
+        ↓
+include schema in replay-visible fingerprint
+        ↓
+only then emit script2agent
+```
+
+输入不满足 schema 时抛出 `AgentInputValidationError`，不会生成 Agent request，也不会让非法输入进入宿主智能边界。
+
+未提供 `input_schema` 时保持 v0.1.4 兼容行为：输入仍需可 JSON 序列化并参与 replay hash。
 
 ### Result Contract
 
@@ -215,6 +234,9 @@ actual.args   == expected_output.args
   },
   "output": {
     "agent_input": {},
+    "input_schema": {
+      "type": "object"
+    },
     "result_file": "/project/.looma/runs/.../0001-agent-result.json",
     "output_schema": {
       "type": "object"
@@ -233,6 +255,7 @@ actual.args   == expected_output.args
 
 - `script`：产生本次交接的程序来源；
 - `output.agent_input`：业务输入；
+- `output.input_schema`：可选输入约束；存在时表示 Runtime 已在 suspend 前校验输入；
 - `output.result_file`：Agent 最终结果文件；
 - `output.output_schema`：结果约束；
 - `task`：本次具体任务；
@@ -319,9 +342,9 @@ Runtime replay 还会再次校验结构化 Agent result，作为绕过 handoff �
 
 ---
 
-## 8. Result schema validation
+## 8. Input and result schema validation
 
-Looma 支持：
+Input Contract 与 Result Contract 共用同一套结构化 schema 描述/校验能力。Looma 支持：
 
 - built-in `dict / list / str / int / float / bool`；
 - dataclass；
@@ -673,6 +696,7 @@ has process-level automated tests
 - Preserve the exact fixed `script2agent.prompt`.
 - Keep `agent2script` limited to exactly `script` and `args`.
 - Treat `expected_output` as a strict Resume Contract.
+- When declared, validate `agent(input=...)` against `input_schema` before suspend.
 - Validate `output.result_file` against `output.output_schema` before resume.
 - Same-command resume must re-run the original Python invocation.
 - Prefer deterministic replay and persisted events over source rewriting or raw stack restoration.
@@ -704,6 +728,7 @@ Regression coverage should include, where applicable:
 - step side-effect deduplication；
 - loops and multiple Agent calls；
 - integrated stock-analysis Agent：AKShare-first acquisition + sourced host fallback + news research + evidence/analysis gates + multiple Agent boundaries；
+- invalid input schema rejection before suspend；
 - invalid result schema rejection；
 - invalid `agent2script` rejection；
 - direct-resume defense；

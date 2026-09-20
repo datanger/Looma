@@ -47,7 +47,8 @@ Looma maps those concepts to:
 
 ```text
 Agent Boundary      -> agent()
-Task Contract       -> script2agent
+Task Contract       -> script2agent.task
+Input Contract      -> agent(input_schema=...) + output.input_schema
 Result Contract     -> output.result_file + output.output_schema
 Resume Contract     -> expected_output
 Resume validation   -> guarded agent2script
@@ -102,11 +103,15 @@ actual.script == expected_output.script
 actual.args   == expected_output.args
 ```
 
-The Agent result must also exist, be valid JSON, and satisfy `output.output_schema`.
+Before suspension, a declared `input_schema` must accept the normalized Agent input. The Agent result must also exist, be valid JSON, and satisfy `output.output_schema`.
 
-## Result validation
+## Input and result validation
 
-Looma emits structural JSON Schema for builtins and dataclass output models, and preserves schema mappings or Pydantic JSON Schema supplied by callers.
+Looma can validate both sides of the semantic boundary. A caller may optionally provide `input_schema`; the normalized JSON-compatible input is validated **before** an Agent request is emitted. Invalid input raises `AgentInputValidationError`, so the workflow never suspends with a structurally invalid boundary input.
+
+The declared input schema is also included in the replay-visible Agent fingerprint. Calls without `input_schema` preserve the v0.1.4 fingerprint for compatibility.
+
+Looma emits structural JSON Schema for builtins and dataclass models, and preserves schema mappings or Pydantic JSON Schema supplied by callers. The same structural validator is used for declared input contracts and Agent result contracts.
 
 The handoff validator supports the structural subset needed at the Agent boundary, including:
 

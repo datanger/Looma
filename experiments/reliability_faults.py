@@ -45,6 +45,7 @@ main()
 
 
 INVALID_CASES = {
+    "invalid_input_schema",
     "missing_result",
     "malformed_result",
     "wrong_result_schema",
@@ -73,9 +74,61 @@ def prepare_case(root: Path) -> tuple[Path, Path, Path, dict[str, str], dict]:
     return script, sentinel, request_file, env, request
 
 
+def run_invalid_input_case(root: Path) -> dict:
+    state_dir = root / "state"
+    sentinel = root / "done.txt"
+    script = root / "invalid_input.py"
+    script.write_text(
+        f"""
+from pathlib import Path
+from looma import agent, workflow
+
+@workflow
+def main():
+    agent(
+        task="validate input",
+        input={{"limit": "five"}},
+        input_schema={{
+            "type": "object",
+            "required": ["limit"],
+            "properties": {{"limit": {{"type": "integer"}}}},
+            "additionalProperties": False,
+        }},
+        output_schema=dict,
+    )
+    Path({str(sentinel)!r}).write_text("done", encoding="utf-8")
+
+main()
+""",
+        encoding="utf-8",
+    )
+    env = looma_env(state_dir)
+    result = run_python([script], cwd=root, env=env)
+    request_files = list(state_dir.glob("runs/*/events/*-script2agent.json"))
+    passed = (
+        result.returncode != 0
+        and not sentinel.exists()
+        and not request_files
+        and "AgentInputValidationError" in result.stderr
+    )
+    return {
+        "case": "invalid_input_schema",
+        "expected_accept": False,
+        "returncode": result.returncode,
+        "accepted": False,
+        "sentinel_exists": sentinel.exists(),
+        "passed": passed,
+        "stdout_tail": result.stdout[-500:],
+        "stderr_tail": result.stderr[-500:],
+    }
+
+
 def run_case(case: str) -> dict:
     with tempfile.TemporaryDirectory(prefix=f"looma-fault-{case}-") as raw:
         root = Path(raw)
+        if case == "invalid_input_schema":
+            return run_invalid_input_case(root)
+
         script, sentinel, request_file, env, request = prepare_case(root)
         result_file = Path(request["output"]["result_file"])
         response = dict(request["expected_output"])

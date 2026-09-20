@@ -14,6 +14,7 @@ result = step(run_tests, repo)
 review = agent(
     task="判断结果是否满足目标，未满足则给出下一步。",
     input=result,
+    input_schema={"type": "object"},
     output_schema=Review,
 )
 
@@ -106,7 +107,8 @@ Looma 不再重复创建第二套模型接入层。
 5. **No duplicate LLM client.** Workflow 不重复配置 LLM API。
 6. **Same command resumes.** 默认恢复动作重新执行原始 Python invocation，而不是暴露内部 resume script。
 7. **Evidence must remain real.** 外部能力失败时可以交给当前宿主补充真实、可核验的证据，但不能用伪造数据让流程继续。
-8. **Completion is a program decision where possible.** Agent 提供语义结果；是否满足完成条件，应尽可能由 Python validation / acceptance gate 决定。
+8. **Boundary inputs can be contracted.** `input_schema` 可在 suspend 前阻止结构错误输入进入 Agent 边界，并成为 replay-visible contract。
+9. **Completion is a program decision where possible.** Agent 提供语义结果；是否满足完成条件，应尽可能由 Python validation / acceptance gate 决定。
 
 ## AEP 的目标
 
@@ -146,3 +148,21 @@ provider step
 ```
 
 关键约束是：Host 使用的是自己的原生工具，Looma 不创建第二个 Agent；live evidence 必须可核验，fixture/mock 只属于测试；如果证据不足，程序应该显式表达不足，而不是伪装成成功。
+
+## Contract-Guarded Agent Boundary
+
+AEP 可以把一次智能计算边界表示为：
+
+```text
+B = (T, I, O, R, A)
+```
+
+其中：
+
+- `T`：Task Contract；
+- `I`：可选 `input_schema` + 经过规范化的 Agent input；
+- `O`：`output_schema` + result file；
+- `R`：必须严格匹配的 Resume Contract；
+- `A`：业务程序自己的 deterministic acceptance gate。
+
+Agent 可以在边界内部自主选择推理和工具路径，但输入、结果与程序恢复都必须跨过确定性的程序契约。

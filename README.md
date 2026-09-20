@@ -41,6 +41,7 @@ def optimize(config):
                 "metrics": metrics,
                 "config": config,
             },
+            input_schema={"type": "object"},
             output_schema=Decision,
         )
 
@@ -76,7 +77,7 @@ agent() 返回
 | `step(fn, ...)` | 持久化确定性或有副作用的步骤，replay 时不重复执行 |
 | `agent(...)` | 把当前任务交还给已经存在的宿主 Coding Agent |
 
-Looma 当前支持普通 Python 分支与循环、多次 Agent 调用、多脚本 Workflow、持久化 replay、结构化 Agent result 校验、严格 resume 校验、Workflow inspect 和独立 run 隔离。
+Looma 当前 `main` 支持普通 Python 分支与循环、多次 Agent 调用、多脚本 Workflow、持久化 replay、可选 Agent input schema 校验、结构化 Agent result 校验、严格 resume 校验、Workflow inspect 和独立 run 隔离。
 
 ## Install
 
@@ -167,7 +168,7 @@ try AKShare 获取真实行情
 
 ## Status
 
-最新发布版本：**v0.1.4 / experimental**。
+最新发布版本：**v0.1.4 / experimental**。当前 `main` 还包含尚未发布的可选 `input_schema` Agent Input Contract 与论文实验代码。
 
 CI 覆盖 Python 3.10、3.11、3.12、3.13，并验证 process restart、loop、多 Agent、多脚本、result schema guard、resume guard、run isolation 与 wheel 安装。
 
