@@ -47,7 +47,7 @@ Looma 是 AEP 的 Python Runtime；**Executable Skill（可执行 Skill）** 是
 优先安装已发布 wheel：
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.0/looma_runtime-0.1.0-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v0.1.1/looma_runtime-0.1.1-py3-none-any.whl
 ```
 
 源码开发：
@@ -167,7 +167,10 @@ Looma 暂停时会：
 3. 执行 `task`；
 4. 将最终结构化业务结果以 UTF-8 JSON 写入 `output.result_file`；
 5. 确保结果满足 `output.output_schema`；
-6. 最后只返回并执行 `expected_output` 指定的 `agent2script`。
+6. 最后只返回 `expected_output` 指定的 `agent2script`；
+7. **不要直接执行未经校验的 Agent 返回命令。** 宿主 / 执行器必须先把实际 agent2script 与 `expected_output` 做严格校验；
+8. 只有 `script`、`args` 与 expected_output 完全一致时才允许执行；
+9. 如果校验失败，必须把 Looma 返回的 `AGENT2SCRIPT_ERROR` 反馈给同一个 Agent，让 Agent 修正输出后重试；错误命令不得执行。
 
 典型 `agent2script`：
 
@@ -237,7 +240,39 @@ Looma 暂停时会：
 
 业务结果已经写入 `result_file`，执行器只需要按照 `script + args` 调用下一个程序。
 
-## 9. 固定 prompt
+## 9. agent2script 严格校验与恢复保护
+
+`expected_output` 是恢复契约，不是建议。
+
+Agent 返回结果后，宿主应将其保存为 JSON，并调用：
+
+```bash
+looma handoff --request <script2agent.json> --response <agent2script.json>
+```
+
+Looma 只接受：
+
+```text
+actual.keys   == {"script", "args"}
+actual.script == expected_output.script
+actual.args   == expected_output.args
+```
+
+任一条件不满足：
+
+- 不执行实际返回命令；
+- 返回退出码 `76`；
+- 输出 `<<<AGENT2SCRIPT_ERROR>>> ... <<<END_AGENT2SCRIPT_ERROR>>>`；
+- 错误中包含 `expected_output`、`actual_output` 和字段差异；
+- 宿主必须把这个错误交回当前 Agent，让 Agent 按 expected_output 修正，再次进入校验。
+
+Agent result 文件也必须已经存在且是合法 JSON，否则同样禁止恢复。
+
+通过校验后，handoff 执行器使用 workflow state 中保存的原始 `cwd` 执行 expected command，确保恢复尽可能发生在原工作目录与原启动上下文中。
+
+**强制规则：宿主不得绕过 handoff 直接执行 Agent 自行返回的命令。** 否则 Looma 无法在执行前完成契约校验。
+
+## 10. 固定 prompt
 
 所有 Looma `script2agent.prompt` 必须逐字使用：
 
@@ -247,7 +282,7 @@ Looma 暂停时会：
 
 具体业务要求只能写入 `task`，脚本/运行时产物只能写入 `output`。
 
-## 10. Replay 规则
+## 11. Replay 规则
 
 Looma V0.1 使用 **same-command replay/resume**，不保存原始 Python 调用栈，也不拼接 Python 源代码。
 
@@ -260,7 +295,7 @@ Looma V0.1 使用 **same-command replay/resume**，不保存原始 Python 调用
 - replay 前发生的副作用必须放进 `step()`；
 - 遇到 `ReplayMismatchError` 时检查代码路径和输入，不要手工篡改 history。
 
-## 11. 循环
+## 12. 循环
 
 AEP 的核心能力之一是让 Agent 自然进入 Python Loop：
 
@@ -284,7 +319,7 @@ def repair(repo):
 
 每一次 Agent 调用会形成独立 event。宿主 Agent 完成后执行同一原命令，Runtime 从入口 replay 并自然进入对应的下一轮。
 
-## 12. 状态与调试
+## 13. 状态与调试
 
 默认状态：
 
@@ -315,7 +350,7 @@ looma reset --yes
 looma skill-path
 ```
 
-## 13. 角色边界
+## 14. 角色边界
 
 **Python / Script：**
 
@@ -343,7 +378,7 @@ looma skill-path
 - resume；
 - `script2agent / agent2script` 边界。
 
-## 14. 不要做什么
+## 15. 不要做什么
 
 不要：
 
@@ -355,7 +390,7 @@ looma skill-path
 - 把含有副作用的程序裸放在 replay 路径上；
 - 把退出码 `75` 当作普通程序失败。
 
-## 15. 核心心智模型
+## 16. 核心心智模型
 
 不要把：
 
