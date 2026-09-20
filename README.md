@@ -5,6 +5,9 @@
 
 Looma 是 **Agent-Embedded Programming（AEP，智能体嵌入式编程）** 的一种 Python 实现。
 
+> **Looma 不启动 Agent，也不负责 Agent / subagent 的并发执行。**  
+> Looma 运行在已经存在的 Coding Agent 宿主环境中。程序到达 `agent(...)` 时只产生一份给宿主 Agent 执行的任务说明并暂停；真正的推理、工具调用、subagent 创建、并发调度与结果汇总全部由当前宿主 Agent 原生完成。
+
 这里先区分三个层次：
 
 ```text
@@ -17,7 +20,7 @@ Looma                      = AEP 的一个 Python Runtime / Framework 实现
 
 > **把宿主 Agent 作为一种可暂停、可恢复的智能计算单元，直接嵌入普通程序控制流。**
 
-在 AEP 中，程序继续拥有 `if`、`for`、`while`、函数调用和异常处理等控制权；Codex、Claude Code、SDW 等宿主 Coding Agent 提供语义理解、分析、判断、规划和 Review 等智能能力；具体 Runtime 实现负责两者之间的 suspend、state、replay、resume 与边界协议。
+在 AEP 中，程序继续拥有 `if`、`for`、`while`、函数调用和异常处理等控制权；Codex、Claude Code、SDW 等已经运行中的宿主 Coding Agent 提供语义理解、分析、判断、规划、Review、原生 subagent 与并发调度能力；具体 Runtime 实现只负责 suspend、state、replay、resume 与边界协议。
 
 **Executable Skill（可执行 Skill）** 可以作为这种范式的一种 Skill 封装形态：Skill 不再只是 Markdown 中的说明和提示词，而可以与真正的程序控制流、循环、状态、函数调用、暂停与恢复机制结合。
 
@@ -123,6 +126,10 @@ while ...:
 ---
 
 ## AEP 的核心思路：让宿主 Agent 成为程序的一部分
+
+> **并发属于宿主执行策略，而不是 Looma Runtime 语义。**  
+> 如果一个 `script2agent.task` 描述了多个相互独立的子任务，程序返回的是“请宿主完成这些任务”的说明。宿主是否使用 subagent、启动多少个 subagent、是否并发、如何隔离 workspace、如何汇总结果，都由当前宿主自身决定。Looma 不调用任何 Agent CLI / SDK / API 来实现这些能力。
+
 
 AEP 的抽象结构是：
 
