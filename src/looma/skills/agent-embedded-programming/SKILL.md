@@ -11,8 +11,8 @@ description: 使用 Looma 实践 Agent-Embedded Programming（AEP，智能体嵌
 
 AEP 中：
 
-- Python 负责 `if`、`for`、`while`、函数调用、异常处理和确定性流程；
-- Codex、Claude Code、SDW 等宿主 Coding Agent 负责分析、判断、规划、Review 和其它语义推理；
+- Python 负责 `if`、`for`、`while`、函数调用、异常处理、确定性流程，以及可以明确编码的完成条件和验收规则；
+- Codex、Claude Code、SDW 等宿主 Coding Agent 负责分析、判断、规划、Review、工具使用和需要语义能力的证据获取；
 - Looma Runtime 负责 suspend、state、replay、resume；
 - Script 与 Agent 之间仍使用 `script2agent` / `agent2script` 两类极简交接协议；
 - 业务 Workflow **不直接配置或调用 LLM API**。模型、会话、上下文和工具权限由宿主 Agent 提供；
@@ -430,7 +430,7 @@ looma skill-path
 - 控制业务流程；
 - 保存真实事实；
 - 执行确定性动作；
-- 管理循环条件；
+- 管理循环条件、重试上限和可以确定性表达的验收门槛；
 - 通过 `step()` 避免 replay 副作用。
 
 **Host Coding Agent：**
@@ -438,6 +438,7 @@ looma skill-path
 - 分析；
 - 判断；
 - 规划；
+- 使用宿主原生工具获取需要语义搜索或核验的真实证据；
 - Review；
 - 按宿主自身能力创建 / 调度 subagent；
 - 在宿主内部执行并发任务并汇总；
@@ -454,7 +455,42 @@ looma skill-path
 - resume；
 - `script2agent / agent2script` 边界。
 
-## 15. 不要做什么
+## 15. 外部能力失败与真实数据 fallback
+
+外部 SDK、API、网站或网络不可用时，可以把失败作为 Workflow 的正常分支处理，但不能为了继续流程而伪造事实。
+
+推荐模式：
+
+```text
+step(): try provider / deterministic capability
+        │
+        ├─ success → continue
+        │
+        └─ recoverable failure
+                ↓
+             agent()
+                ↓
+      当前 Host 使用原生工具补充
+                ↓
+        sourced real evidence
+                ↓
+       step(): validate / accept
+                │
+                ├─ pass → continue
+                └─ fail → retry / insufficient_evidence / fail
+```
+
+执行规则：
+
+- `agent()` 仍然只把任务交回当前宿主，不得启动另一个 Coding Agent；
+- Host 可以使用当前会话已有的 web/search/browser、终端、文件或其它原生工具取得真实信息；
+- 外部事实应保留来源 URL、文件引用或其它可核验 provenance；
+- 禁止编造、插值、估算或生成伪造业务事实来填补 live data 缺口；
+- Agent 可以报告“证据不足”，不要为了满足 schema 而杜撰数据；
+- 是否达到完成条件应尽可能由后续 Python validator / acceptance gate 决定，而不是只相信 Agent 自己声明 `done=true`；
+- 达到有限重试次数后仍不足，应显式输出 `insufficient_evidence` 或失败；
+- fixture/mock 可以用于 CI 测试控制流，但不能作为真实执行的业务证据。
+## 16. 不要做什么
 
 不要：
 
@@ -468,7 +504,7 @@ looma skill-path
 - 把含有副作用的程序裸放在 replay 路径上；
 - 把退出码 `75` 当作普通程序失败。
 
-## 16. 核心心智模型
+## 17. 核心心智模型
 
 不要把：
 
