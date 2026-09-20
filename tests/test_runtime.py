@@ -295,3 +295,172 @@ def test_guarded_handoff_executes_only_validated_command(tmp_path: Path):
 
     assert code == 0
     assert sentinel.read_text(encoding="utf-8") == "ok"
+
+
+def test_cli_handoff_rejects_wrong_command_then_resumes_exact_workflow(tmp_path: Path):
+    script = tmp_path / "workflow.py"
+    state_dir = tmp_path / "state"
+    wrong_side_effect = tmp_path / "wrong-command-executed.txt"
+
+    script.write_text(
+        """
+from dataclasses import dataclass
+from looma import workflow, agent
+
+@dataclass
+class Decision:
+    choice: str
+
+@workflow
+def main():
+    decision = agent(
+        task="choose A",
+        input={"value": 1},
+        output_schema=Decision,
+    )
+    print("FINAL", decision.choice)
+
+main()
+""",
+        encoding="utf-8",
+    )
+
+    first = run_script(script, tmp_path, state_dir)
+    assert first.returncode == 75
+
+    run_dir = latest_run(state_dir)
+    request_file = run_dir / "events" / "0000-script2agent.json"
+    request = json.loads(request_file.read_text(encoding="utf-8"))
+    Path(request["output"]["result_file"]).write_text(
+        '{"choice":"A"}',
+        encoding="utf-8",
+    )
+
+    wrong_script = tmp_path / "wrong.py"
+    wrong_script.write_text(
+        f"from pathlib import Path; Path({str(wrong_side_effect)!r}).write_text('bad')",
+        encoding="utf-8",
+    )
+    response_file = tmp_path / "agent2script.json"
+    response_file.write_text(
+        json.dumps(
+            {
+                "script": sys.executable,
+                "args": [str(wrong_script)],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(SRC)
+    env["LOOMA_STATE_DIR"] = str(state_dir)
+
+    rejected = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "looma.cli",
+            "handoff",
+            "--request",
+            str(request_file),
+            "--response",
+            str(response_file),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+    assert rejected.returncode == 76
+    assert "<<<AGENT2SCRIPT_ERROR>>>" in rejected.stdout
+    assert "expected_output" in rejected.stdout
+    assert "actual_output" in rejected.stdout
+    assert not wrong_side_effect.exists()
+
+    response_file.write_text(
+        json.dumps(request["expected_output"]),
+        encoding="utf-8",
+    )
+
+    resumed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "looma.cli",
+            "handoff",
+            "--request",
+            str(request_file),
+            "--response",
+            str(response_file),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+    assert resumed.returncode == 0, resumed.stderr
+    assert "FINAL A" in resumed.stdout
+    assert not wrong_side_effect.exists()
+
+
+def test_cli_handoff_refuses_resume_without_agent_result(tmp_path: Path):
+    run_dir = tmp_path / "runs" / "run-1"
+    events_dir = run_dir / "events"
+    events_dir.mkdir(parents=True)
+
+    target = tmp_path / "target.py"
+    sentinel = tmp_path / "executed.txt"
+    target.write_text(
+        f"from pathlib import Path; Path({str(sentinel)!r}).write_text('executed')",
+        encoding="utf-8",
+    )
+
+    expected = {
+        "script": sys.executable,
+        "args": [str(target)],
+    }
+    missing_result = events_dir / "0000-agent-result.json"
+    request_file = events_dir / "0000-script2agent.json"
+    request_file.write_text(
+        json.dumps(
+            {
+                "output": {"result_file": str(missing_result)},
+                "expected_output": expected,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "state.json").write_text(
+        json.dumps({"invocation": {"cwd": str(tmp_path)}}),
+        encoding="utf-8",
+    )
+
+    response_file = tmp_path / "agent2script.json"
+    response_file.write_text(json.dumps(expected), encoding="utf-8")
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(SRC)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "looma.cli",
+            "handoff",
+            "--request",
+            str(request_file),
+            "--response",
+            str(response_file),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 76
+    assert "Agent result is missing" in result.stdout
+    assert not sentinel.exists()
