@@ -1,0 +1,32 @@
+[
+  {
+    "qid": "q1",
+    "question": "In which city is the Eiffel Tower located?",
+    "answer": "Paris"
+  },
+  {
+    "qid": "q2",
+    "question": "What is the capital of Japan?",
+    "answer": "Tokyo"
+  },
+  {
+    "qid": "q3",
+    "question": "What is the capital of Australia?",
+    "answer": "Canberra"
+  },
+  {
+    "qid": "q4",
+    "question": "Who painted the Mona Lisa?",
+    "answer": "Leonardo da Vinci"
+  },
+  {
+    "qid": "q5",
+    "question": "Where is the Great Barrier Reef located?",
+    "answer": "Queensland"
+  },
+  {
+    "qid": "q6",
+    "question": "Which mountain is the highest in Japan?",
+    "answer": "Mount Fuji"
+  }
+]

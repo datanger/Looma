@@ -26,7 +26,17 @@ def public_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
         "id": scenario["id"],
         "question": scenario["question"],
         "requirements": scenario["requirements"],
+        "candidate_sources": list(scenario.get("candidate_sources", [])),
     }
+
+
+def split_of(scenario: dict[str, Any]) -> str:
+    """Experiment-side split label. Never part of the public task information."""
+    return scenario.get("split", "dev")
+
+
+def scenarios_for_split(split: str) -> list[dict[str, Any]]:
+    return [scenario for scenario in load_scenarios() if split_of(scenario) == split]
 
 
 def list_sources(scenario_id: str) -> dict[str, Any]:

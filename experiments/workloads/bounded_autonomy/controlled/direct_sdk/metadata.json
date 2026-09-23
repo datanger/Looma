@@ -1,0 +1,14 @@
+{
+  "label": "Direct SDK / hand-written loop",
+  "paradigm": "direct_sdk",
+  "count_files": ["workflow.py"],
+  "widened_count_files": ["workflow.py", "widened.py"],
+  "declared_routes": {
+    "dev": ["read"],
+    "widened": ["read", "list"]
+  },
+  "framework_constructs": ["application-owned action set", "hand-written plan/execute loop"],
+  "route_ownership": "application",
+  "route_note": "The application itself enumerates the actions it may take, so the held-out split needs a second edit (widened.py) that declares the discovery action.",
+  "fixture_mode_note": "Uses the shared deterministic driver policy so that only the route declaration differs between paradigms."
+}

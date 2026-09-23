@@ -1,0 +1,16 @@
+{
+  "label": "AEP / Looma (Host-native route)",
+  "paradigm": "looma",
+  "count_files": ["workflow.py"],
+  "widened_count_files": ["workflow.py"],
+  "declared_routes": {
+    "dev": [],
+    "widened": []
+  },
+  "excluded_harness_files": ["host_driver.py"],
+  "framework_constructs": ["@workflow", "step()", "agent()", "script2agent handoff", "Result/Resume Contract"],
+  "route_ownership": "host",
+  "route_note": "The application declares no action route at all; it declares a task boundary, a Result Contract and a deterministic step(validate_result) gate. The Host owns the route set, so the same command and the same file satisfy both splits.",
+  "widening_note": "There is no widened variant: widening is a Host-side act and costs the application zero SLOC.",
+  "fixture_mode_note": "host_driver.py only simulates the external Host for deterministic CI and is excluded from application LOC; the host tool trace is written to <output>.host.json."
+}

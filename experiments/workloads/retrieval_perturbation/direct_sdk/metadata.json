@@ -1,0 +1,31 @@
+{
+  "label": "Direct SDK / hand-written retrieval loop",
+  "paradigm": "direct_sdk",
+  "application_file": "direct_sdk/workflow.py",
+  "count_files": {
+    "dev": ["direct_sdk/workflow.py"],
+    "widened": ["direct_sdk/workflow.py", "direct_sdk/widened.py"]
+  },
+  "declared_routes": {
+    "dev": [
+      "semantic_search",
+      "keyword_search",
+      "read_chunk"
+    ],
+    "widened": [
+      "semantic_search",
+      "keyword_search",
+      "read_chunk",
+      "list_chunks"
+    ]
+  },
+  "framework_constructs": [
+    "hand-written retrieval loop",
+    "explicit tool dispatch",
+    "application-owned route table"
+  ],
+  "route_ownership": "application",
+  "route_note": "The application owns both the trajectory and the set of actions the trajectory can reach. Absorbing a re-keyed corpus requires adding the list_chunks route and a branch that consumes it, after the evaluation split has already been run.",
+  "widening_note": "Widening cost is direct_sdk/widened.py plus the routes_for branch in workflow.py.",
+  "fixture_mode_note": "Deterministic driver stands in for the model; these numbers measure route flexibility and retrieval reach, not answer quality."
+}

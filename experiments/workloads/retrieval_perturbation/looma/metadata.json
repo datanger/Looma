@@ -1,0 +1,26 @@
+{
+  "label": "AEP / Looma (Host-native retrieval route)",
+  "paradigm": "looma",
+  "application_file": "looma/workflow.py",
+  "host_file": "looma/host_driver.py",
+  "count_files": {
+    "dev": ["looma/workflow.py"],
+    "widened": ["looma/workflow.py"]
+  },
+  "declared_routes": {
+    "dev": [],
+    "widened": []
+  },
+  "framework_constructs": [
+    "@workflow",
+    "step()",
+    "agent()",
+    "script2agent handoff",
+    "Result/Resume Contract",
+    "program-owned acceptance gate"
+  ],
+  "route_ownership": "host",
+  "route_note": "The application declares no retrieval route at all: a semantic task boundary, a Result Contract, and a deterministic step(validate_result) gate. The Host owns the reachable action set, so the same command and the same file satisfy both batches.",
+  "widening_note": "There is no widened variant. Widening is a Host-side act that costs the application zero SLOC.",
+  "fixture_mode_note": "host_driver.py only simulates the external Host for deterministic CI and is excluded from application LOC; the Host tool trace is written to <output>.host.json."
+}
