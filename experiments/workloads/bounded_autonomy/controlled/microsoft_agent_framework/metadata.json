@@ -1,0 +1,15 @@
+{
+  "label": "Microsoft Agent Framework functional workflow",
+  "paradigm": "microsoft_agent_framework",
+  "count_files": ["workflow.py"],
+  "widened_count_files": ["workflow.py", "widened.py"],
+  "declared_routes": {
+    "dev": ["read"],
+    "widened": ["read", "list"]
+  },
+  "framework_version": "1.19.0",
+  "framework_constructs": ["@workflow", "build()", "run()", "get_outputs()"],
+  "route_ownership": "workflow",
+  "route_note": "The workflow's executor set fixes which actions can be issued; widening means registering an additional executor.",
+  "fixture_mode_note": "Uses the shared deterministic driver policy so that only the executor set differs between paradigms."
+}

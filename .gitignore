@@ -10,3 +10,5 @@ dist/
 .DS_Store
 .looma-codex-e2e/
 experiments/results/
+# AIKO/SDW session resources and local memory are machine-local state.
+.sdw/

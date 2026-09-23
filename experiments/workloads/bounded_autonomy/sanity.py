@@ -10,6 +10,21 @@ from experiments.workloads.bounded_autonomy.environment import (
     read_source,
 )
 from experiments.workloads.bounded_autonomy.validator import validate_result
+from experiments.workloads.bounded_autonomy.validator import score_result
+
+
+def feedback_leaks_oracle(scenario: dict, problems: list[str]) -> bool:
+    """True if retry feedback would hand the Agent oracle-only information."""
+    joined = " ".join(problems)
+    needles = [str(scenario["oracle"]["decision"])]
+    needles.extend(str(item) for item in scenario["oracle"].get("supporting_source_ids") or [])
+    for needle in needles:
+        # The decision word may legitimately appear as part of the enum list.
+        if needle in {"approve", "reject", "insufficient"} and f"expected {needle}" not in joined:
+            continue
+        if needle and needle in joined:
+            return True
+    return False
 
 
 def static_route(scenario: dict) -> dict:
@@ -78,15 +93,21 @@ def main() -> int:
         adaptive = adaptive_oracle(scenario)
         static_check = validate_result(scenario["id"], static)
         adaptive_check = validate_result(scenario["id"], adaptive)
+        static_score = score_result(scenario["id"], static)
+        adaptive_score = score_result(scenario["id"], adaptive)
         rows.append(
             {
                 "scenario_id": scenario["id"],
-                "static_success": static_check["status"] == "ready",
-                "adaptive_oracle_success": adaptive_check["status"] == "ready",
+                "static_success": static_score["task_success"],
+                "adaptive_oracle_success": adaptive_score["task_success"],
                 "static_tool_path": static["tool_path"],
                 "adaptive_tool_path": adaptive["tool_path"],
                 "static_problems": static_check["problems"],
                 "adaptive_problems": adaptive_check["problems"],
+                "gate_feedback_problems": static_check["problems"],
+                "gate_feedback_leaks_oracle": feedback_leaks_oracle(
+                    scenario, static_check["problems"]
+                ),
             }
         )
 
@@ -105,6 +126,9 @@ def main() -> int:
             ),
             "adaptive_oracle_success_rate": round(
                 sum(row["adaptive_oracle_success"] for row in rows) / len(rows), 4
+            ),
+            "gate_feedback_leaks_oracle": any(
+                row["gate_feedback_leaks_oracle"] for row in rows
             ),
         },
     }

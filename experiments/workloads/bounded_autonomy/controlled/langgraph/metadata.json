@@ -1,0 +1,15 @@
+{
+  "label": "LangGraph StateGraph",
+  "paradigm": "langgraph",
+  "count_files": ["workflow.py"],
+  "widened_count_files": ["workflow.py", "widened.py"],
+  "declared_routes": {
+    "dev": ["read"],
+    "widened": ["read", "list"]
+  },
+  "framework_version": "1.2.11",
+  "framework_constructs": ["StateGraph", "state schema", "nodes", "edges", "conditional edges", "compile/invoke"],
+  "route_ownership": "graph",
+  "route_note": "Route flexibility is expressed as graph topology: the dev graph has no node that can issue a discovery action, so widening means adding a node and a conditional edge rather than editing a permission list.",
+  "fixture_mode_note": "Uses the shared deterministic driver policy so that only the graph topology differs between paradigms."
+}

@@ -51,6 +51,15 @@ A direct claim about **developer time** requires a prospective timed implementat
 
 Can AEP solve perturbed tasks without changing application control-flow code by allowing the Host to adapt its internal reasoning/tool path?
 
+**Public-data rule.** Every instance reported under RQ2 must come from a recognised public
+benchmark. Mechanism experiments may author the *harness* (the perturbation transform, the
+tool surface, the acceptance gate, the scoring) but never the task instances, gold answers
+or supporting evidence. The current RQ2 harness is
+`experiments/workloads/retrieval_perturbation/` on the pinned MuSiQue / HotpotQA /
+2WikiMultiHopQA corpora; see `research/RETRIEVAL_PERTURBATION_PROTOCOL.md`. The earlier
+self-authored seven-scenario suite is retained only as a mechanism fixture and its numbers
+are inadmissible.
+
 Perturbations:
 
 - primary tool unavailable;

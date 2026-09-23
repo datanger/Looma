@@ -1,0 +1,5 @@
+Fixture corpus. Hand-written, in the shape of the pinned public A-RAG files.
+
+It exists only so control-flow tests can run without network access. The runner
+labels any dataset directory carrying this marker as `mode: fixture` and refuses
+to treat its numbers as a benchmark. Never report these values.
