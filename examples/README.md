@@ -1,6 +1,8 @@
-# Looma example
+# Looma examples
 
-Looma intentionally keeps **one integrated example**:
+Looma includes a compact AEP + GEPA-style optimization example and one integrated external-data example:
+
+- [gepa_optimization/](gepa_optimization/) — a deterministic candidate evaluator with Host Agent reflection, acceptance gates, Pareto frontier state, and same-command replay/resume.
 
 - [stock_analysis_agent/](stock_analysis_agent/) — a short-term stock analysis Agent that combines AKShare-first market data with sourced host-web fallback, recent-news web research, deterministic evidence checks, a research loop, structured Agent results, and optional host-native subagent concurrency.
 
