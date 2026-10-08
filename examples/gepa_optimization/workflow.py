@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from looma import step, workflow
+from looma.optimization import candidate_id, select_candidate
 from looma.optimization.engine import request_reflection
 from looma.optimization.protocol import Candidate, EvaluationBatch
 from looma.optimization.state import OptimizationState, accept_proposal
@@ -60,34 +61,54 @@ def main() -> None:
     state = OptimizationState.initialize(
         {"instruction": "Answer directly."},
         max_iterations=3,
+        score_threshold=1.0,
     )
-    evaluation = step(ADAPTER.evaluate, DATASET, state.seed_candidate, capture_traces=True)
-    proposal = request_reflection(
-        task=(
-            "Analyze the evaluation traces and propose a candidate update. "
-            "Improve the instruction component while preserving its scope."
-        ),
-        candidate=state.seed_candidate,
-        evaluation=evaluation,
-        frontier_ids=state.frontier.ids,
-        metric_calls=evaluation["metric_calls"],
-        remaining_budget=10 - evaluation["metric_calls"],
-    )
-    accepted = step(
-        accept_proposal,
-        state,
-        proposal,
-        scores={"example": 1.0},
-        parent_scores={"example": 0.5},
-        metric_calls=evaluation["metric_calls"],
-    )
-    if not accepted["accepted"]:
-        raise RuntimeError(accepted["reason"])
+    while not state.should_stop:
+        parent = select_candidate(state)
+        parent_id = candidate_id(parent)
+        parent_evaluation = step(
+            ADAPTER.evaluate,
+            DATASET,
+            parent,
+            capture_traces=True,
+        )
+        proposal = request_reflection(
+            task=(
+                "Analyze the evaluation traces and propose a candidate update. "
+                "Improve the instruction component while preserving its scope."
+            ),
+            candidate=parent,
+            evaluation=parent_evaluation,
+            frontier_ids=state.frontier.ids,
+            metric_calls=parent_evaluation["metric_calls"],
+            remaining_budget=10 - state.metric_calls - parent_evaluation["metric_calls"],
+        )
+        proposal_evaluation = step(
+            ADAPTER.evaluate,
+            DATASET,
+            proposal.candidate,
+            capture_traces=True,
+        )
+        accepted = step(
+            accept_proposal,
+            state,
+            proposal,
+            scores={"example": proposal_evaluation["scores"][0]},
+            parent_scores={"example": parent_evaluation["scores"][0]},
+            metric_calls=(
+                parent_evaluation["metric_calls"]
+                + proposal_evaluation["metric_calls"]
+            ),
+            parent_candidate_id=parent_id,
+        )
+        if not accepted["accepted"]:
+            raise RuntimeError(accepted["reason"])
+        state = OptimizationState.from_json(accepted["state"])
 
     result = {
         "accepted": accepted["accepted"],
-        "candidate": accepted["state"]["candidates"][accepted["candidate_id"]],
-        "frontier": accepted["state"]["frontier"]["ids"],
+        "candidate": state.best_candidate,
+        "frontier": list(state.frontier.ids),
     }
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
 

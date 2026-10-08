@@ -144,30 +144,42 @@ Looma 的 `looma.optimization` 是一个可选的通用协议层，不是第四�
 一个最小循环如下：
 
 ```python
-from looma import agent, step, workflow
+from looma import step, workflow
+from looma.optimization import candidate_id, select_candidate
 from looma.optimization.engine import request_reflection
 from looma.optimization.state import OptimizationState, accept_proposal
 
 @workflow
 def optimize(adapter, batch):
     state = OptimizationState.initialize({"prompt": "start"}, max_iterations=5)
-    evaluation = step(adapter.evaluate, batch, state.seed_candidate, capture_traces=True)
-    proposal = request_reflection(
-        task="根据 evaluation 的 ASI 改进 candidate，并只更新已声明组件。",
-        candidate=state.seed_candidate,
-        evaluation=evaluation,
-        frontier_ids=state.frontier.ids,
-        metric_calls=evaluation["metric_calls"],
-        remaining_budget=20,
-    )
-    return step(
-        accept_proposal,
-        state,
-        proposal,
-        scores={"validation": 1.0},
-        parent_scores={"validation": 0.5},
-        metric_calls=evaluation["metric_calls"],
-    )
+    while not state.should_stop:
+        parent = select_candidate(state)
+        parent_evaluation = step(adapter.evaluate, batch, parent, capture_traces=True)
+        proposal = request_reflection(
+            task="根据 evaluation 的 ASI 改进 candidate，并只更新已声明组件。",
+            candidate=parent,
+            evaluation=parent_evaluation,
+            frontier_ids=state.frontier.ids,
+            metric_calls=parent_evaluation["metric_calls"],
+            remaining_budget=20 - state.metric_calls,
+        )
+        proposal_evaluation = step(adapter.evaluate, batch, proposal.candidate)
+        accepted = step(
+            accept_proposal,
+            state,
+            proposal,
+            scores={"validation": proposal_evaluation["scores"][0]},
+            parent_scores={"validation": parent_evaluation["scores"][0]},
+            metric_calls=(
+                parent_evaluation["metric_calls"]
+                + proposal_evaluation["metric_calls"]
+            ),
+            parent_candidate_id=candidate_id(parent),
+        )
+        if not accepted["accepted"]:
+            raise RuntimeError(accepted["reason"])
+        state = OptimizationState.from_json(accepted["state"])
+    return state.best_candidate
 ```
 
 该循环仍然由普通 Python 决定是否继续、何时停止以及什么算作成功。Host Agent 只负责语义反思和 proposal，不负责偷偷改变 frontier 或宣布业务完成。

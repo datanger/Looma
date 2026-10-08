@@ -45,3 +45,19 @@ class ParetoFrontier:
 
     def contains(self, candidate_id: str) -> bool:
         return candidate_id in self.scores
+
+
+def select_candidate_id(frontier: ParetoFrontier) -> str:
+    """Select a deterministic frontier member, preferring higher scores."""
+
+    if not frontier.ids:
+        raise ValueError("cannot select a candidate from an empty frontier")
+    dimensions = sorted(next(iter(frontier.scores.values())))
+    return min(
+        frontier.ids,
+        key=lambda candidate: tuple(
+            [-sum(frontier.scores[candidate].values())]
+            + [-frontier.scores[candidate][dimension] for dimension in dimensions]
+            + [candidate]
+        ),
+    )

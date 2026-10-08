@@ -403,7 +403,7 @@ candidate 是 `dict[str, str]`，每个 key 是可独立更新的文本组件。
 - 可选 trajectory；
 - 可选 ASI，例如错误、约束违反、性能数据、工具轨迹和 evaluator feedback。
 
-Evaluator 属于业务程序。应通过 `step(adapter.evaluate, ...)` 持久化结果，使 replay 不重复昂贵计算或副作用。
+Evaluator 属于业务程序。应通过 `step(adapter.evaluate, ...)` 持久化 parent 和 proposal 的结果，使 replay 不重复昂贵计算或副作用。GEPA 闭环至少应包含：评估 parent → Host reflection → 评估 proposal → Python acceptance gate。
 
 ### 13.2 Host reflection
 
@@ -435,6 +435,8 @@ proposal = request_reflection(
 - metric budget、iteration、score threshold 和 no-improvement patience 是否满足。
 
 Pareto frontier 只移除被另一候选在所有 score dimensions 上不差且至少一个维度更好的候选；在不同实例或目标上互补的候选应保留。候选 identity 和排序必须稳定，以便 replay 结果可复现。
+
+不要用 Host 自己声明的分数或固定常量替代 proposal evaluation；proposal 必须经过程序指定的 evaluator，acceptance gate 只消费程序产生的 score 和 evidence。
 
 GEPA 在这里是一种可组合的优化能力，而不是 Looma 的强制运行模式。普通 Workflow 仍然只需要 `@workflow`、`step()` 和 `agent()`；不需要安装外部 `gepa` 包或任何 direct model SDK。
 

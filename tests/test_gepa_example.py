@@ -70,4 +70,9 @@ def test_gepa_example_suspends_and_resumes_without_repeating_evaluation(tmp_path
     assert '"accepted": true' in resumed.stdout
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "completed"
-    assert [event["kind"] for event in state["events"]] == ["step", "agent", "step"]
+    assert [event["kind"] for event in state["events"]] == [
+        "step",
+        "agent",
+        "step",
+        "step",
+    ]

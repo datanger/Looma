@@ -27,7 +27,7 @@ import os
 from pathlib import Path
 
 from looma import step, workflow
-from looma.optimization import CandidateProposal
+from looma.optimization import CandidateProposal, candidate_id
 from looma.optimization.engine import request_reflection
 from looma.optimization.state import OptimizationState, accept_proposal
 
@@ -36,9 +36,10 @@ def evaluate(candidate):
     counter = Path(os.environ["COUNTER_FILE"])
     current = int(counter.read_text(encoding="utf-8")) if counter.exists() else 0
     counter.write_text(str(current + 1), encoding="utf-8")
+    score = 1.0 if candidate["prompt"] == "improved" else 0.5
     return {
         "outputs": [candidate["prompt"]],
-        "scores": [0.5],
+        "scores": [score],
         "trajectories": [{"failure": "needs improvement"}],
         "side_information": [{"failure": "needs improvement"}],
         "metric_calls": 1,
@@ -57,13 +58,15 @@ def main():
         metric_calls=evaluation["metric_calls"],
         remaining_budget=9,
     )
+    proposal_evaluation = step(evaluate, proposal.candidate)
     accepted = step(
         accept_proposal,
         state,
         proposal,
-        scores={"case": 1.0},
-        parent_scores={"case": 0.5},
-        metric_calls=evaluation["metric_calls"],
+        scores={"case": proposal_evaluation["scores"][0]},
+        parent_scores={"case": evaluation["scores"][0]},
+        metric_calls=evaluation["metric_calls"] + proposal_evaluation["metric_calls"],
+        parent_candidate_id=candidate_id(state.seed_candidate),
     )
     if not accepted["accepted"]:
         raise RuntimeError(accepted["reason"])
@@ -141,13 +144,13 @@ def test_restart_replays_evaluation_and_accepts_proposal_once(tmp_path: Path):
     resumed = _handoff(request_file, request, _env(state_dir, counter_file))
 
     assert resumed.returncode == 0, resumed.stderr
-    assert counter_file.read_text(encoding="utf-8") == "1"
+    assert counter_file.read_text(encoding="utf-8") == "2"
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "completed"
-    assert len(state["events"]) == 3
-    assert [event["kind"] for event in state["events"]] == ["step", "agent", "step"]
+    assert len(state["events"]) == 4
+    assert [event["kind"] for event in state["events"]] == ["step", "agent", "step", "step"]
     assert state["events"][1]["status"] == "completed"
-    accepted = json.loads(Path(state["events"][2]["result_file"]).read_text(encoding="utf-8"))
+    accepted = json.loads(Path(state["events"][3]["result_file"]).read_text(encoding="utf-8"))
     assert accepted["accepted"] is True
     assert len(accepted["state"]["frontier"]["ids"]) == 1
 
@@ -208,10 +211,10 @@ def test_run_keys_isolate_optimization_instances(tmp_path: Path):
             _env(state_dir, counter_file, run_key),
         )
         assert resumed.returncode == 0, resumed.stderr
-        assert counter_file.read_text(encoding="utf-8") == "1"
+        assert counter_file.read_text(encoding="utf-8") == "2"
         state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
         assert state["status"] == "completed"
         accepted = json.loads(
-            Path(state["events"][2]["result_file"]).read_text(encoding="utf-8")
+            Path(state["events"][3]["result_file"]).read_text(encoding="utf-8")
         )
         assert accepted["accepted"] is True

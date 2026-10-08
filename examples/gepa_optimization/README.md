@@ -6,7 +6,8 @@ This example keeps Looma's Agent-Embedded Programming model intact while adding 
 2. `step()` evaluates the candidate durably.
 3. `request_reflection()` hands traces and actionable side information to the current Host Agent through `agent()`.
 4. The Host Agent writes a structured `CandidateProposal` result and returns the exact `agent2script` command.
-5. `step(accept_proposal, ...)` applies deterministic gates and records the accepted candidate.
+5. A second durable `step()` evaluates the proposed candidate.
+6. `step(accept_proposal, ...)` applies deterministic gates and records the accepted candidate.
 
 The evaluator is deterministic and local. The example does not import the external `gepa` package, call a model API, launch another Agent, or require network access.
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..serde import normalize_json
-from .pareto import ParetoFrontier
+from .pareto import ParetoFrontier, select_candidate_id
 from .protocol import Candidate, CandidateProposal, candidate_id
 
 
@@ -91,6 +91,25 @@ class OptimizationState:
         ):
             return True
         return False
+
+    @property
+    def frontier_summary(self) -> dict[str, Any]:
+        return normalize_json(
+            {
+                "candidate_ids": list(self.frontier.ids),
+                "scores": self.frontier.scores,
+            }
+        )
+
+    @property
+    def best_candidate_id(self) -> str:
+        if not self.frontier.ids:
+            return candidate_id(self.seed_candidate)
+        return select_candidate_id(self.frontier)
+
+    @property
+    def best_candidate(self) -> Candidate:
+        return dict(self.candidates[self.best_candidate_id])
 
     def to_json(self) -> dict[str, Any]:
         return normalize_json(
@@ -181,6 +200,7 @@ def accept_proposal(
     parent_scores: Mapping[str, float],
     hard_constraints: Sequence[Callable[[Candidate], bool]] = (),
     metric_calls: int = 0,
+    parent_candidate_id: str | None = None,
 ) -> AcceptanceResult:
     """Apply deterministic gates and return a new state when a candidate is accepted."""
 
@@ -205,10 +225,10 @@ def accept_proposal(
         return _reject(state, "proposal candidate must preserve the configured components")
     if set(normalized_scores) != set(normalized_parent_scores):
         return _reject(state, "candidate and parent must use the same score dimensions")
-    if (
-        state.current_scores is not None
-        and normalized_parent_scores != state.current_scores
-    ):
+    parent_id = parent_candidate_id or state.current_candidate_id or candidate_id(state.seed_candidate)
+    if parent_candidate_id is not None and parent_id not in state.candidates:
+        return _reject(state, "parent candidate is not registered")
+    if state.current_scores is not None and parent_id == state.current_candidate_id and normalized_parent_scores != state.current_scores:
         return _reject(state, "parent scores do not match the current optimization state")
     if proposed_id in state.candidates:
         return _reject(state, "candidate has already been evaluated")
@@ -220,7 +240,6 @@ def accept_proposal(
     except Exception as exc:
         return _reject(state, f"hard constraint failed: {exc}")
 
-    parent_id = state.current_candidate_id or candidate_id(state.seed_candidate)
     frontier = state.frontier
     if not frontier.scores:
         frontier = frontier.add(parent_id, normalized_parent_scores)
@@ -270,3 +289,28 @@ def accept_proposal(
         reason="accepted",
         candidate_id=proposed_id,
     )
+
+
+def initialize(
+    seed_candidate: Mapping[str, str],
+    *,
+    max_iterations: int,
+    max_metric_calls: int | None = None,
+    score_threshold: float | None = None,
+    no_improvement_patience: int | None = None,
+) -> OptimizationState:
+    """Create an optimization state through the package-level public API."""
+
+    return OptimizationState.initialize(
+        seed_candidate,
+        max_iterations=max_iterations,
+        max_metric_calls=max_metric_calls,
+        score_threshold=score_threshold,
+        no_improvement_patience=no_improvement_patience,
+    )
+
+
+def select_candidate(state: OptimizationState) -> Candidate:
+    """Return the deterministically selected frontier candidate or the seed."""
+
+    return dict(state.best_candidate)
