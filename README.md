@@ -79,6 +79,18 @@ agent() 返回
 
 Looma 当前 `main` 支持普通 Python 分支与循环、多次 Agent 调用、多脚本 Workflow、持久化 replay、可选 Agent input schema 校验、结构化 Agent result 校验、严格 resume 校验、Workflow inspect 和独立 run 隔离。
 
+## AEP + GEPA-style optimization
+
+Looma 还提供一个可选的 `looma.optimization` 辅助层，用于在 AEP Workflow 中表达 GEPA 风格的反思式优化：
+
+- Python 程序拥有 candidate evaluation、预算、停止条件和 acceptance gate；
+- evaluator 可以返回 score、trajectory 与 ASI（Actionable Side Information）；
+- `request_reflection()` 通过现有 `agent()` 边界把证据交给当前 Host Agent；
+- `CandidateProposal` 经过结构校验后，由 Python 更新确定性的 Pareto frontier；
+- candidate、frontier 和验收结果都可以通过 `step()` 参与 replay/resume。
+
+这不是第二个 Agent，也不要求安装外部 `gepa` 包。Looma 不引入 direct model client；模型、工具和反思能力仍属于当前 Host Coding Agent。
+
 ## Install
 
 ```bash
@@ -130,7 +142,10 @@ Agent/subagent 的推理、工具调用、并发调度与结果汇总都属于�
 
 ## Example
 
-仓库只保留一个完整案例：[examples/stock_analysis_agent/](examples/stock_analysis_agent/)。
+仓库包含一个 AEP + GEPA-style 优化案例和一个完整的外部数据案例：
+
+- [examples/gepa_optimization/](examples/gepa_optimization/) — 本地确定性 evaluator、Host Agent 反思、acceptance gate、Pareto frontier 和 same-command replay/resume；
+- [examples/stock_analysis_agent/](examples/stock_analysis_agent/) — 真实数据与证据门控的综合案例。
 
 它实现一个短期股票分析 Agent：
 
@@ -168,7 +183,7 @@ try AKShare 获取真实行情
 
 ## Status
 
-最新发布版本：**v0.1.4 / experimental**。当前 `main` 还包含尚未发布的可选 `input_schema` Agent Input Contract 与论文实验代码。
+最新发布版本：**v0.1.4 / experimental**。当前开发分支还包含尚未发布的 `input_schema` Agent Input Contract 与可选 AEP + GEPA-style optimization capability。
 
 CI 覆盖 Python 3.10、3.11、3.12、3.13，并验证 process restart、loop、多 Agent、多脚本、result schema guard、resume guard、run isolation 与 wheel 安装。
 

@@ -110,6 +110,68 @@ Looma 不再重复创建第二套模型接入层。
 8. **Boundary inputs can be contracted.** `input_schema` 可在 suspend 前阻止结构错误输入进入 Agent 边界，并成为 replay-visible contract。
 9. **Completion is a program decision where possible.** Agent 提供语义结果；是否满足完成条件，应尽可能由 Python validation / acceptance gate 决定。
 
+## AEP 中的 GEPA 风格反思式优化
+
+AEP 的控制流也可以承载 GEPA 风格的 candidate optimization，而不改变三层职责：
+
+```text
+Python candidate evaluation + acceptance gate
+              ↓
+score / trajectory / ASI
+              ↓
+current Host Agent through agent()
+              ↓
+CandidateProposal
+              ↓
+Python Pareto frontier + durable state
+```
+
+Looma 的 `looma.optimization` 是一个可选的通用协议层，不是第四个执行原语，也不是外部 GEPA 包的隐藏封装。candidate 是 `dict[str, str]`，可以表示 prompt、skill instruction、policy、configuration 或 code artifact。`EvaluationBatch` 可以携带：
+
+- 每个样本的输出和 higher-is-better score；
+- 可选 objective score 映射；
+- 可选 trajectory；
+- 可选 ASI（Actionable Side Information），例如失败、约束违反、性能数据、工具轨迹和 evaluator feedback。
+
+推荐的职责划分是：
+
+- Python 用 `step()` 执行 candidate evaluation，保存 JSON-compatible evaluation evidence；
+- 当前 Host Agent 通过 `agent()` 阅读 score、trajectory 和 ASI，返回结构化 `CandidateProposal`；
+- Python 用 deterministic acceptance gate 检查组件范围、硬约束、回归规则、分数门槛和预算；
+- `Pareto frontier` 保留在不同实例或目标上互补的候选，并用稳定 candidate identity 和确定性排序；
+- Looma 只负责这次交接的 suspend、state、replay 和 resume，不创建新的模型客户端、Agent、subagent 或隐藏 retry engine。
+
+一个最小循环如下：
+
+```python
+from looma import agent, step, workflow
+from looma.optimization.engine import request_reflection
+from looma.optimization.state import OptimizationState, accept_proposal
+
+@workflow
+def optimize(adapter, batch):
+    state = OptimizationState.initialize({"prompt": "start"}, max_iterations=5)
+    evaluation = step(adapter.evaluate, batch, state.seed_candidate, capture_traces=True)
+    proposal = request_reflection(
+        task="根据 evaluation 的 ASI 改进 candidate，并只更新已声明组件。",
+        candidate=state.seed_candidate,
+        evaluation=evaluation,
+        frontier_ids=state.frontier.ids,
+        metric_calls=evaluation["metric_calls"],
+        remaining_budget=20,
+    )
+    return step(
+        accept_proposal,
+        state,
+        proposal,
+        scores={"validation": 1.0},
+        parent_scores={"validation": 0.5},
+        metric_calls=evaluation["metric_calls"],
+    )
+```
+
+该循环仍然由普通 Python 决定是否继续、何时停止以及什么算作成功。Host Agent 只负责语义反思和 proposal，不负责偷偷改变 frontier 或宣布业务完成。
+
 ## AEP 的目标
 
 最终，调用 Agent 应该像调用普通函数一样自然：

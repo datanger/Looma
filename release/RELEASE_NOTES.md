@@ -1,3 +1,10 @@
+# Next / unreleased
+
+- Added an optional `looma.optimization` layer for AEP-centered GEPA-style reflective optimization.
+- Added serializable candidate/evaluation/proposal contracts, deterministic Pareto tracking, acceptance gates, budgets, and Host-native reflection through the existing `agent()` boundary.
+- Added restart/replay/isolation coverage and a local deterministic `examples/gepa_optimization/` example.
+- Kept the base wheel pure Python with no external GEPA package, LLM SDK, or Agent launcher dependency.
+
 # Looma v0.1.4
 
 Clean patch release for the host-native AEP guidance and integrated stock-analysis Agent work.

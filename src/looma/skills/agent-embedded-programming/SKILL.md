@@ -376,6 +376,68 @@ def repair(repo):
 
 每一次 Agent 调用会形成独立 event。宿主 Agent 完成后执行同一原命令，Runtime 从入口 replay 并自然进入对应的下一轮。
 
+## 13. AEP + GEPA-style 反思式优化
+
+当需要迭代优化 prompt、Skill instruction、policy、配置或代码文本时，可以使用 `looma.optimization`，把 GEPA 风格的 reflective optimization 嵌入普通 AEP 控制流。
+
+它不是第四个 Runtime 原语，也不是第二个 Agent：
+
+```text
+Program owns candidate evaluation and acceptance
+        ↓
+score / trajectory / ASI (Actionable Side Information)
+        ↓
+current Host Agent through agent()
+        ↓
+CandidateProposal
+        ↓
+deterministic Pareto frontier and durable state
+```
+
+### 13.1 Candidate 与 evaluator
+
+candidate 是 `dict[str, str]`，每个 key 是可独立更新的文本组件。实现 `OptimizationAdapter` 时，`evaluate()` 返回 `EvaluationBatch`：
+
+- 每个输入对应一个 output 和 higher-is-better score；
+- 可选 objective score；
+- 可选 trajectory；
+- 可选 ASI，例如错误、约束违反、性能数据、工具轨迹和 evaluator feedback。
+
+Evaluator 属于业务程序。应通过 `step(adapter.evaluate, ...)` 持久化结果，使 replay 不重复昂贵计算或副作用。
+
+### 13.2 Host reflection
+
+使用 `request_reflection()` 将当前 candidate、evaluation、ASI、frontier candidate IDs 和剩余预算交给当前宿主：
+
+```python
+from looma.optimization.engine import request_reflection
+
+proposal = request_reflection(
+    task="根据 evaluation 的 ASI 改进 candidate，并只更新已声明组件。",
+    candidate=state.seed_candidate,
+    evaluation=evaluation,
+    frontier_ids=state.frontier.ids,
+    metric_calls=evaluation["metric_calls"],
+    remaining_budget=20,
+)
+```
+
+这个 helper 最终只调用现有的 `agent()` 边界，要求 Host 返回结构化 `CandidateProposal`。Host 可以使用自己的模型、工具或原生 subagent，但 Looma 不创建 direct model client，不调用 LLM SDK，不启动另一个 Agent，也不隐藏 retry loop。
+
+### 13.3 Acceptance 与 Pareto frontier
+
+程序必须用 `step(accept_proposal, ...)` 或等价的 deterministic Python gate 检查：
+
+- candidate 是否只更新已知组件；
+- 所有组件值是否为 JSON-compatible 字符串；
+- hard constraints 是否通过；
+- candidate 是否相对 parent 在 Pareto 意义上有价值；
+- metric budget、iteration、score threshold 和 no-improvement patience 是否满足。
+
+Pareto frontier 只移除被另一候选在所有 score dimensions 上不差且至少一个维度更好的候选；在不同实例或目标上互补的候选应保留。候选 identity 和排序必须稳定，以便 replay 结果可复现。
+
+GEPA 在这里是一种可组合的优化能力，而不是 Looma 的强制运行模式。普通 Workflow 仍然只需要 `@workflow`、`step()` 和 `agent()`；不需要安装外部 `gepa` 包或任何 direct model SDK。
+
 ## 13. 状态与调试
 
 默认状态：
