@@ -1,6 +1,6 @@
 # AEP-GEPA Capability Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a general-purpose, Host-native GEPA-style reflective optimization capability while preserving Looma's AEP primitives, pure-Python wheel, and replay/resume contracts.
 
@@ -18,7 +18,7 @@
 - Create: `src/looma/optimization/protocol.py`
 - Create: `tests/test_optimization_protocol.py`
 
-- [ ] **Step 1: Write failing protocol tests**
+- [x] **Step 1: Write failing protocol tests**
 
 The tests must cover stable candidate identity, aligned per-example values, JSON normalization, and rejection of non-string candidate components:
 
@@ -47,13 +47,13 @@ def test_evaluation_batch_requires_aligned_values():
         EvaluationBatch(outputs=["ok"], scores=[])
 ~~~
 
-- [ ] **Step 2: Run the focused tests and verify they fail**
+- [x] **Step 2: Run the focused tests and verify they fail**
 
 Run: `pytest -q tests/test_optimization_protocol.py`
 
 Expected: import failure because `looma.optimization` does not exist.
 
-- [ ] **Step 3: Implement the protocol**
+- [x] **Step 3: Implement the protocol**
 
 Create `protocol.py` with:
 
@@ -129,13 +129,13 @@ class OptimizationAdapter(Protocol):
 
 Export only `Candidate`, `CandidateProposal`, `EvaluationBatch`, `OptimizationAdapter`, and `candidate_id`. Do not add a model or Agent dependency.
 
-- [ ] **Step 4: Run the focused tests**
+- [x] **Step 4: Run the focused tests**
 
 Run: `pytest -q tests/test_optimization_protocol.py`
 
 Expected: all protocol tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ~~~bash
 git add src/looma/optimization tests/test_optimization_protocol.py
@@ -149,7 +149,7 @@ git commit -m "feat: add AEP optimization protocol"
 - Create: `src/looma/optimization/pareto.py`
 - Create: `tests/test_optimization_pareto.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Cover strict dominance, complementary candidates, deterministic tie-breaking, and missing-dimension rejection:
 
@@ -171,13 +171,13 @@ def test_equal_scores_are_sorted_deterministically():
     assert frontier.ids == ("a", "z")
 ~~~
 
-- [ ] **Step 2: Run the tests and verify they fail**
+- [x] **Step 2: Run the tests and verify they fail**
 
 Run: `pytest -q tests/test_optimization_pareto.py`
 
 Expected: import failure for `looma.optimization.pareto`.
 
-- [ ] **Step 3: Implement immutable frontier operations**
+- [x] **Step 3: Implement immutable frontier operations**
 
 Implement:
 
@@ -196,13 +196,13 @@ class ParetoFrontier:
 
 Add a candidate only when no existing candidate dominates it; remove candidates it dominates; sort IDs lexicographically. Require identical score dimensions for every comparison. Copy nested mappings on every update so an old replay value cannot be mutated.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pytest -q tests/test_optimization_pareto.py`
 
 Expected: all Pareto tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ~~~bash
 git add src/looma/optimization/pareto.py tests/test_optimization_pareto.py
@@ -216,7 +216,7 @@ git commit -m "feat: add deterministic Pareto frontier"
 - Create: `src/looma/optimization/state.py`
 - Create: `tests/test_optimization_state.py`
 
-- [ ] **Step 1: Write failing state tests**
+- [x] **Step 1: Write failing state tests**
 
 Cover state round-trip, budget counters, unknown component rejection, hard constraints, and no-mutation-on-rejection:
 
@@ -251,13 +251,13 @@ def test_hard_constraint_rejects_higher_score():
     assert result.accepted is False
 ~~~
 
-- [ ] **Step 2: Run the tests and verify they fail**
+- [x] **Step 2: Run the tests and verify they fail**
 
 Run: `pytest -q tests/test_optimization_state.py`
 
 Expected: import failure for `looma.optimization.state`.
 
-- [ ] **Step 3: Implement state and acceptance**
+- [x] **Step 3: Implement state and acceptance**
 
 Define JSON-compatible dataclasses:
 
@@ -298,13 +298,13 @@ class OptimizationState:
 
 Implement `accept_proposal()` returning `AcceptanceResult(state, accepted, reason)`. It must reject unknown components, non-string values, failed hard constraints, and candidates that do not meet the configured acceptance criterion. Use `normalize_json()` and `candidate_id()`; do not persist callables, model clients, or arbitrary Python objects.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pytest -q tests/test_optimization_state.py`
 
 Expected: all state and acceptance tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ~~~bash
 git add src/looma/optimization/state.py tests/test_optimization_state.py
@@ -319,7 +319,7 @@ git commit -m "feat: add durable optimization state and acceptance gates"
 - Modify: `src/looma/optimization/__init__.py`
 - Create: `tests/test_optimization_engine.py`
 
-- [ ] **Step 1: Write failing engine tests**
+- [x] **Step 1: Write failing engine tests**
 
 Test payload construction and monkeypatch the existing `agent()` function to prove no model client is used:
 
@@ -358,23 +358,23 @@ def test_request_reflection_delegates_to_agent(monkeypatch):
     assert seen["output_schema"] is CandidateProposal
 ~~~
 
-- [ ] **Step 2: Run the tests and verify they fail**
+- [x] **Step 2: Run the tests and verify they fail**
 
 Run: `pytest -q tests/test_optimization_engine.py`
 
 Expected: import failure for `looma.optimization.engine`.
 
-- [ ] **Step 3: Implement pure payload construction and Host delegation**
+- [x] **Step 3: Implement pure payload construction and Host delegation**
 
 Implement `build_reflection_input()` and `request_reflection()`. The latter must call the existing `looma.api.agent` with `output_schema=CandidateProposal`. It must not create a client, invoke a subprocess, or retry internally. Export these helpers from `looma.optimization`.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pytest -q tests/test_optimization_engine.py`
 
 Expected: all engine tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ~~~bash
 git add src/looma/optimization/engine.py src/looma/optimization/__init__.py tests/test_optimization_engine.py
@@ -388,7 +388,7 @@ git commit -m "feat: route optimization reflection through host agent"
 - Create: `tests/test_optimization_restart.py`
 - Modify: `tests/test_run_isolation.py` only if a shared helper is required
 
-- [ ] **Step 1: Add a temporary suspended workflow**
+- [x] **Step 1: Add a temporary suspended workflow**
 
 The subprocess test must evaluate a candidate through `step()`, increment a side-effect counter, call `request_reflection()`, and suspend with exit code `75`. After writing a valid `CandidateProposal` result file, invoke the same original command and assert:
 
@@ -397,21 +397,21 @@ The subprocess test must evaluate a candidate through `step()`, increment a side
 - the final candidate is accepted;
 - the frontier contains the accepted candidate.
 
-- [ ] **Step 2: Add invalid-result and guarded-handoff cases**
+- [x] **Step 2: Add invalid-result and guarded-handoff cases**
 
 Use the existing `looma handoff` command to prove malformed proposal JSON, unknown components, and failed hard constraints cannot resume or mutate state. Assert exit code `76` for handoff validation failures.
 
-- [ ] **Step 3: Add two-instance isolation**
+- [x] **Step 3: Add two-instance isolation**
 
 Run the same workflow with `LOOMA_RUN_KEY=job-a` and `LOOMA_RUN_KEY=job-b`. Assert each run has independent state, event files, candidates, and frontier.
 
-- [ ] **Step 4: Run the process tests**
+- [x] **Step 4: Run the process tests**
 
 Run: `pytest -q tests/test_optimization_restart.py tests/test_run_isolation.py`
 
 Expected: all restart, guarded-resume, and isolation tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ~~~bash
 git add tests/test_optimization_restart.py tests/test_run_isolation.py
@@ -427,21 +427,21 @@ git commit -m "test: cover optimization restart and isolation"
 - Modify: `examples/README.md`
 - Create: `tests/test_gepa_example.py`
 
-- [ ] **Step 1: Write the smoke test**
+- [x] **Step 1: Write the smoke test**
 
 Run the example in a temporary `LOOMA_STATE_DIR`; assert the first process exits `75`, write a valid proposal to the emitted `result_file`, resume the original command, and assert the final output contains the accepted candidate and frontier summary.
 
-- [ ] **Step 2: Implement the deterministic example**
+- [x] **Step 2: Implement the deterministic example**
 
 Use a small adapter that scores whether candidate text causes a deterministic transformation. The example must show `@workflow`, a `step()` around `adapter.evaluate`, `request_reflection()` with the evaluation payload, and a `step()` around `accept_proposal`. It must not call a model, network service, external GEPA package, or subprocess Agent. The README must state that the Host Agent supplies the proposal during the `script2agent` pause.
 
-- [ ] **Step 3: Run the example test**
+- [x] **Step 3: Run the example test**
 
 Run: `pytest -q tests/test_gepa_example.py`
 
 Expected: suspension and same-command resume complete without repeating the evaluation side effect.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ~~~bash
 git add examples/gepa_optimization tests/test_gepa_example.py examples/README.md
@@ -459,15 +459,15 @@ git commit -m "feat: add AEP GEPA optimization example"
 - Modify: `pyproject.toml` only if package discovery requires it
 - Create: `tests/test_optimization_packaging.py`
 
-- [ ] **Step 1: Add documentation tests**
+- [x] **Step 1: Add documentation tests**
 
 Assert that the packaged Skill mentions candidate evaluation, ASI, Pareto frontier, Host reflection through `agent()`, and the prohibition on direct model clients.
 
-- [ ] **Step 2: Document the public contracts**
+- [x] **Step 2: Document the public contracts**
 
 Document the adapter, explicit Python optimization loop, trace/ASI payload, Pareto behavior, acceptance gates, budgets, and replay behavior. Explain that an external GEPA backend may implement the same protocol later, but is not a core dependency.
 
-- [ ] **Step 3: Verify wheel contents**
+- [x] **Step 3: Verify wheel contents**
 
 Run:
 
@@ -478,7 +478,7 @@ unzip -l dist/*.whl | rg 'looma/optimization|looma/skills/agent-embedded-program
 
 Expected: optimization modules and the updated Skill are present; wheel metadata contains no model SDK dependency.
 
-- [ ] **Step 4: Run the complete suite**
+- [x] **Step 4: Run the complete suite**
 
 Run:
 
@@ -489,7 +489,7 @@ python -m compileall -q src examples
 
 Expected: all tests pass and compilation exits `0`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ~~~bash
 git add README.md docs/agent-embedded-programming.md src/looma/skills/agent-embedded-programming/SKILL.md release/RELEASE_NOTES.md pyproject.toml tests/test_optimization_packaging.py
@@ -498,7 +498,7 @@ git commit -m "docs: document AEP GEPA capability"
 
 ## Task 8: Final completion audit
 
-- [ ] **Step 1: Verify the public API**
+- [x] **Step 1: Verify the public API**
 
 Run:
 
@@ -508,7 +508,7 @@ python -c 'from looma import agent, step, workflow; import looma.optimization as
 
 Expected: the three existing primitives import successfully and optimization exports are explicit.
 
-- [ ] **Step 2: Verify no direct model dependency**
+- [x] **Step 2: Verify no direct model dependency**
 
 Run:
 
@@ -518,7 +518,7 @@ rg -n 'openai|anthropic|litellm|codex|claude|subprocess.*agent' src/looma/optimi
 
 Expected: no direct model/client or Agent-launch code in the optimization package or dependency metadata.
 
-- [ ] **Step 3: Audit the implementation against the design**
+- [x] **Step 3: Audit the implementation against the design**
 
 Run:
 
