@@ -18,6 +18,7 @@ def build_reflection_input(
     frontier_ids: Sequence[str],
     metric_calls: int,
     remaining_budget: int | None,
+    components_to_update: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Build a JSON-compatible reflection payload without invoking a model."""
 
@@ -29,6 +30,11 @@ def build_reflection_input(
     return normalize_json(
         {
             "candidate": candidate,
+            "components_to_update": list(
+                sorted(components_to_update)
+                if components_to_update is not None
+                else sorted(candidate)
+            ),
             "evaluation": evaluation,
             "frontier": {"candidate_ids": list(frontier_ids)},
             "budget": {
@@ -47,6 +53,7 @@ def request_reflection(
     frontier_ids: Sequence[str],
     metric_calls: int,
     remaining_budget: int | None,
+    components_to_update: Sequence[str] | None = None,
 ) -> CandidateProposal:
     """Delegate semantic candidate reflection to the current Host Agent."""
 
@@ -56,6 +63,7 @@ def request_reflection(
         frontier_ids=frontier_ids,
         metric_calls=metric_calls,
         remaining_budget=remaining_budget,
+        components_to_update=components_to_update,
     )
     return agent(
         task=task,

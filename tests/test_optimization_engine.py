@@ -14,10 +14,12 @@ def test_reflection_payload_contains_asi_and_budget():
         frontier_ids=["seed"],
         metric_calls=4,
         remaining_budget=6,
+        components_to_update=["prompt"],
     )
 
     assert payload["evaluation"]["side_information"][0]["error"] == "missing evidence"
     assert payload["budget"]["remaining_metric_calls"] == 6
+    assert payload["components_to_update"] == ["prompt"]
 
 
 def test_request_reflection_delegates_to_agent(monkeypatch):

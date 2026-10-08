@@ -18,6 +18,7 @@ def test_reflection_and_proposal_schemas_are_structural():
     assert proposal_schema["type"] == "object"
     assert reflection_schema["required"] == [
         "candidate",
+        "components_to_update",
         "evaluation",
         "frontier",
         "budget",

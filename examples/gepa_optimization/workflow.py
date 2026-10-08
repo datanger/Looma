@@ -79,6 +79,7 @@ def main() -> None:
             ),
             candidate=parent,
             evaluation=parent_evaluation,
+            components_to_update=["instruction"],
             frontier_ids=state.frontier.ids,
             metric_calls=parent_evaluation["metric_calls"],
             remaining_budget=10 - state.metric_calls - parent_evaluation["metric_calls"],

@@ -24,6 +24,10 @@ def reflection_input_schema() -> dict[str, Any]:
                 "type": "object",
                 "additionalProperties": {"type": "string"},
             },
+            "components_to_update": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
             "evaluation": {"type": "object"},
             "frontier": {
                 "type": "object",
@@ -48,6 +52,12 @@ def reflection_input_schema() -> dict[str, Any]:
                 "additionalProperties": False,
             },
         },
-        "required": ["candidate", "evaluation", "frontier", "budget"],
+        "required": [
+            "candidate",
+            "components_to_update",
+            "evaluation",
+            "frontier",
+            "budget",
+        ],
         "additionalProperties": False,
     }

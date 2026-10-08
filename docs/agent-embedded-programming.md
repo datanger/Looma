@@ -159,6 +159,7 @@ def optimize(adapter, batch):
             task="根据 evaluation 的 ASI 改进 candidate，并只更新已声明组件。",
             candidate=parent,
             evaluation=parent_evaluation,
+            components_to_update=["prompt"],
             frontier_ids=state.frontier.ids,
             metric_calls=parent_evaluation["metric_calls"],
             remaining_budget=20 - state.metric_calls,
