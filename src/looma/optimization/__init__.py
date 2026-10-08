@@ -7,6 +7,7 @@ from .protocol import (
     OptimizationAdapter,
     candidate_id,
 )
+from .engine import build_reflection_input, request_reflection
 
 __all__ = [
     "Candidate",
@@ -14,4 +15,6 @@ __all__ = [
     "EvaluationBatch",
     "OptimizationAdapter",
     "candidate_id",
+    "build_reflection_input",
+    "request_reflection",
 ]
