@@ -196,4 +196,3 @@ Connect proposal generation to `agent()`, persist reflection references and opti
 ### Phase 3: Usability and integrations
 
 Add inspect output, richer stop/budget policies, optional external GEPA adapter compatibility, and documentation/Skill updates based on the verified public behavior.
-
