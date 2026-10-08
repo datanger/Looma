@@ -192,7 +192,11 @@ def test_run_keys_isolate_optimization_instances(tmp_path: Path):
         "job-b",
     }
 
-    for run_dir, counter_file, run_key in zip(runs, (counter_a, counter_b), ("job-a", "job-b")):
+    counters = {"job-a": counter_a, "job-b": counter_b}
+    for run_dir in runs:
+        run_state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        run_key = run_state["invocation"]["run_key"]
+        counter_file = counters[run_key]
         request_file = next((run_dir / "events").glob("*-script2agent.json"))
         request = json.loads(request_file.read_text(encoding="utf-8"))
         Path(request["output"]["result_file"]).write_text(
