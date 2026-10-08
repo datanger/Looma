@@ -1,5 +1,7 @@
+from dataclasses import replace
+
 from looma.optimization import CandidateProposal
-from looma.optimization.state import OptimizationState, accept_proposal
+from looma.optimization.state import OptimizationConfig, OptimizationState, accept_proposal
 
 
 def test_state_round_trip_is_json_compatible():
@@ -50,3 +52,38 @@ def test_nondominated_proposal_updates_budget_and_frontier():
     assert result.state.metric_calls == 2
     assert result.candidate_id in result.state.frontier.ids
     assert result.state.candidates[result.candidate_id]["prompt"] == "improved"
+
+
+def test_exhausted_metric_budget_rejects_without_mutation():
+    state = replace(
+        OptimizationState.initialize({"prompt": "start"}, max_iterations=3),
+        config=OptimizationConfig(max_iterations=3, max_metric_calls=0),
+    )
+    result = accept_proposal(
+        state,
+        CandidateProposal({"prompt": "improved"}, ["prompt"]),
+        scores={"case": 1.0},
+        parent_scores={"case": 0.5},
+    )
+
+    assert result.accepted is False
+    assert result.state == state
+
+
+def test_parent_scores_must_match_current_state():
+    state = OptimizationState.initialize({"prompt": "start"}, max_iterations=3)
+    first = accept_proposal(
+        state,
+        CandidateProposal({"prompt": "first"}, ["prompt"]),
+        scores={"case": 1.0},
+        parent_scores={"case": 0.5},
+    )
+    second = accept_proposal(
+        first.state,
+        CandidateProposal({"prompt": "second"}, ["prompt"]),
+        scores={"case": 1.5},
+        parent_scores={"case": 0.0},
+    )
+
+    assert second.accepted is False
+    assert second.state == first.state

@@ -41,7 +41,15 @@ class OptimizationState:
     current_scores: dict[str, float] | None = None
 
     @classmethod
-    def initialize(cls, seed_candidate: Mapping[str, str], *, max_iterations: int) -> "OptimizationState":
+    def initialize(
+        cls,
+        seed_candidate: Mapping[str, str],
+        *,
+        max_iterations: int,
+        max_metric_calls: int | None = None,
+        score_threshold: float | None = None,
+        no_improvement_patience: int | None = None,
+    ) -> "OptimizationState":
         seed = dict(seed_candidate)
         seed_id = candidate_id(seed)
         return cls(
@@ -52,7 +60,12 @@ class OptimizationState:
             metric_calls=0,
             no_improvement_rounds=0,
             status="running",
-            config=OptimizationConfig(max_iterations=max_iterations),
+            config=OptimizationConfig(
+                max_iterations=max_iterations,
+                max_metric_calls=max_metric_calls,
+                score_threshold=score_threshold,
+                no_improvement_patience=no_improvement_patience,
+            ),
         )
 
     @property
@@ -171,6 +184,8 @@ def accept_proposal(
 ) -> AcceptanceResult:
     """Apply deterministic gates and return a new state when a candidate is accepted."""
 
+    if state.should_stop:
+        return _reject(state, "optimization budget or stop condition is exhausted")
     if metric_calls < 0:
         return _reject(state, "metric_calls must be non-negative")
 
@@ -190,6 +205,11 @@ def accept_proposal(
         return _reject(state, "proposal candidate must preserve the configured components")
     if set(normalized_scores) != set(normalized_parent_scores):
         return _reject(state, "candidate and parent must use the same score dimensions")
+    if (
+        state.current_scores is not None
+        and normalized_parent_scores != state.current_scores
+    ):
+        return _reject(state, "parent scores do not match the current optimization state")
     if proposed_id in state.candidates:
         return _reject(state, "candidate has already been evaluated")
 
