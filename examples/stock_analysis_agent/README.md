@@ -35,11 +35,17 @@ agent(): multi-angle analysis
              ↓
       host-native gather
              ↓
-needs more evidence?
+deterministic analysis validation
       │
-      ├─ yes ─→ agent(): targeted research ─→ loop
+      ├─ needs more evidence ─→ agent(): targeted research ─→ loop
       │
-      └─ no
+      ├─ validation failed ─→ GEPA candidate reflection
+      │                              ↓
+      │                    proposal analysis + acceptance gate
+      │                              │
+      │                    revised strategy ─→ loop
+      │
+      └─ ready ────────────────→
              ↓
 render_report.py
       ↓
@@ -47,6 +53,16 @@ stock-analysis.md / stock-analysis.json
 ```
 
 The Agent task describes independent analysis tracks. If the current host supports native subagents, the host may execute those tracks concurrently. Looma itself never launches an Agent, subagent, CLI, SDK, or model API.
+
+The final analysis stage also demonstrates the GEPA-style capability embedded
+in AEP. Python keeps an `analysis_instruction` candidate and evaluates each
+analysis with the deterministic `validate_analysis.py` gate. When the output
+is schema-valid but fails that gate, the current Host Agent receives the
+validation problems through `request_reflection()`, proposes a revised
+candidate, and the same analysis is replayed under that candidate. Python
+accepts the proposal with `accept_proposal()` and only the accepted strategy is
+recorded in the final report. Evidence acquisition, report status, and the
+final news gate remain program-owned.
 
 ## Data
 

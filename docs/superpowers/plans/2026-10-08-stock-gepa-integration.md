@@ -15,17 +15,17 @@
 **Files:**
 - Modify: `tests/test_stock_analysis_agent.py:207-351`
 
-- [ ] **Step 1: Change the first analysis fixture to be schema-valid but fail the deterministic validator without requesting more research.**
+- [x] **Step 1: Change the first analysis fixture to be schema-valid but fail the deterministic validator without requesting more research.**
 
 Set `needs_more_research` to `False`, keep the four analysis tracks, and make `market_evidence` empty. Assert that the next request is a GEPA reflection task containing `CandidateProposal`-relevant strategy language and the validation failure.
 
-- [ ] **Step 2: Run the focused test and verify it fails at the new reflection request.**
+- [x] **Step 2: Run the focused test and verify it fails at the new reflection request.**
 
 Run: `PYTHONPATH=src /home/ki-zj-2551/work/Code/QuantStrategy/.pixi/envs/sequence-ml/bin/python -m pytest -q tests/test_stock_analysis_agent.py::test_stock_analysis_agent_host_fallback_and_research_loop`
 
 Expected: FAIL because the current stock workflow has no GEPA reflection request after a failed analysis validation.
 
-- [ ] **Step 3: Add a candidate proposal fixture and assertions for the proposal-analysis resume.**
+- [x] **Step 3: Add a candidate proposal fixture and assertions for the proposal-analysis resume.**
 
 The proposal must be:
 
@@ -40,7 +40,7 @@ The proposal must be:
 
 After resuming with this proposal, assert a new analysis request carrying the proposed strategy, then resume with a ready analysis and assert the final report is complete.
 
-- [ ] **Step 4: Run the focused test again and confirm it still fails only because production code has not implemented the new path.**
+- [x] **Step 4: Run the focused test again and confirm it still fails only because production code has not implemented the new path.**
 
 Run the same focused pytest command. Expected: FAIL at the missing strategy/reflection event rather than at test setup.
 
@@ -50,7 +50,7 @@ Run the same focused pytest command. Expected: FAIL at the missing strategy/refl
 - Modify: `examples/stock_analysis_agent/workflow.py:17-20,315-396`
 - Modify: `examples/stock_analysis_agent/README.md:30-49`
 
-- [ ] **Step 1: Add the optimization imports and the default strategy candidate.**
+- [x] **Step 1: Add the optimization imports and the default strategy candidate.**
 
 Add:
 
@@ -66,15 +66,15 @@ DEFAULT_ANALYSIS_INSTRUCTION = (
 
 Initialize an `OptimizationState` immediately before the existing analysis loop with the single `analysis_instruction` component and a bounded iteration budget derived from `max_research_rounds`.
 
-- [ ] **Step 2: Add deterministic conversion from validation output to `EvaluationBatch`.**
+- [x] **Step 2: Add deterministic conversion from validation output to `EvaluationBatch`.**
 
 Create a small pure helper that gives a higher-is-better score of `1.0` when `validate_analysis.py` returns `ready`, otherwise `0.0`, and stores the validation problems plus the analysis output in `side_information`. Set `metric_calls=1` for each evaluated analysis result.
 
-- [ ] **Step 3: Include the selected candidate in the existing final-analysis task and input.**
+- [x] **Step 3: Include the selected candidate in the existing final-analysis task and input.**
 
 Append the candidate instruction to the task as a bounded strategy hint and add `analysis_strategy` to the Agent input. Do not move evidence acquisition or allow the Agent to decide report status.
 
-- [ ] **Step 4: On a deterministic analysis-validation failure, request and evaluate a proposal.**
+- [x] **Step 4: On a deterministic analysis-validation failure, request and evaluate a proposal.**
 
 When `needs_more_research` is false but validation is not ready:
 
@@ -87,11 +87,11 @@ When `needs_more_research` is false but validation is not ready:
 
 Do not pass Python callables as step arguments; the stock path must keep all replay-visible values JSON-compatible.
 
-- [ ] **Step 5: Preserve the existing research-supplement path.**
+- [x] **Step 5: Preserve the existing research-supplement path.**
 
 If either analysis says `needs_more_research=true`, keep the current targeted research behavior and do not treat the Agent self-declaration as acceptance. The final evidence check and `report_status` calculation remain unchanged.
 
-- [ ] **Step 6: Update the stock README diagram and prose.**
+- [x] **Step 6: Update the stock README diagram and prose.**
 
 Document that the final analysis stage now has a deterministic validation failure branch into GEPA-style candidate reflection, proposal evaluation, and acceptance before report rendering.
 
@@ -101,19 +101,19 @@ Document that the final analysis stage now has a deterministic validation failur
 - Test: `tests/test_stock_analysis_agent.py`
 - Test: `tests/test_examples.py`
 
-- [ ] **Step 1: Run the focused stock integration test.**
+- [x] **Step 1: Run the focused stock integration test.**
 
 Run: `PYTHONPATH=src /home/ki-zj-2551/work/Code/QuantStrategy/.pixi/envs/sequence-ml/bin/python -m pytest -q tests/test_stock_analysis_agent.py`
 
 Expected: PASS, including the GEPA reflection event, accepted candidate, replayed steps, and completed report.
 
-- [ ] **Step 2: Run all optimization and stock regression tests.**
+- [x] **Step 2: Run all optimization and stock regression tests.**
 
 Run: `PYTHONPATH=src /home/ki-zj-2551/work/Code/QuantStrategy/.pixi/envs/sequence-ml/bin/python -m pytest -q tests/test_optimization_*.py tests/test_gepa_example.py tests/test_stock_analysis_agent.py tests/test_examples.py`
 
 Expected: PASS with zero failures.
 
-- [ ] **Step 3: Compile every example and inspect the working tree.**
+- [x] **Step 3: Compile every example and inspect the working tree.**
 
 Run: `PYTHONPATH=src /home/ki-zj-2551/work/Code/QuantStrategy/.pixi/envs/sequence-ml/bin/python -m pytest -q tests/test_examples.py && git status --short`
 

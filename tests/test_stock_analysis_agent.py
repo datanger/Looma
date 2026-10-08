@@ -213,10 +213,7 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
             "news/event",
             "risk/counter-evidence",
         ],
-        "market_evidence": [
-            "2026-09-17 close=244 volume=320 turnover_rate=8.4%",
-            "2026-09-18 close=252 volume=350 turnover_rate=9.1%",
-        ],
+        "market_evidence": [],
         "news_evidence_urls": ["https://example.test/news-b"],
         "technical_view": "价格处于短期上行区间，但样本较短。",
         "volume_turnover_view": "成交量和换手率同步抬升，需要确认事件驱动。",
@@ -285,10 +282,7 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
             "news/event",
             "risk/counter-evidence",
         ],
-        "market_evidence": [
-            "2026-09-14~2026-09-18 close increased from 231 to 252",
-            "2026-09-18 volume=350 and turnover_rate=9.1%",
-        ],
+        "market_evidence": [],
         "news_evidence_urls": [
             "https://example.test/news-b",
             "https://example.test/company-c",
@@ -303,10 +297,63 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
         "watch_signals": ["成交量能否维持", "换手率是否快速回落", "是否出现新的正式公告"],
     }
 
-    final, _ = _resume(
+    fifth, _ = _resume(
         request_file=request5_file,
         response_file=tmp_path / "agent2script-5.json",
         result=analysis2,
+        cwd=tmp_path,
+        env=env,
+    )
+    assert fifth.returncode == 75, fifth.stderr
+    request6_file = _latest_request(run_dir)
+    request6 = json.loads(request6_file.read_text(encoding="utf-8"))
+    assert set(request6["output"]["output_schema"]["properties"]) >= {
+        "candidate",
+        "components_to_update",
+    }
+    assert "分析校验" in request6["task"]
+
+    proposal = {
+        "candidate": {
+            "analysis_instruction": (
+                "Cite concrete market observations and explicitly state counter-evidence."
+            )
+        },
+        "components_to_update": ["analysis_instruction"],
+        "rationale": "The validator found that the analysis omitted concrete market evidence.",
+        "hypothesis": "A stronger evidence instruction will produce an acceptable analysis.",
+        "targeted_failure": "market_evidence must cite concrete market observations",
+    }
+    sixth, _ = _resume(
+        request_file=request6_file,
+        response_file=tmp_path / "agent2script-6.json",
+        result=proposal,
+        cwd=tmp_path,
+        env=env,
+    )
+    assert sixth.returncode == 75, sixth.stderr
+    request7_file = _latest_request(run_dir)
+    request7 = json.loads(request7_file.read_text(encoding="utf-8"))
+    assert "analysis_strategy" in request7["output"]["agent_input"]
+    assert request7["output"]["agent_input"]["analysis_strategy"]["analysis_instruction"].startswith(
+        "Cite concrete market observations"
+    )
+
+    analysis3 = {
+        **analysis2,
+        "market_evidence": [
+            "2026-09-14~2026-09-18 close increased from 231 to 252",
+            "2026-09-18 volume=350 and turnover_rate=9.1%",
+        ],
+        "news_evidence_urls": [
+            "https://example.test/news-b",
+            "https://example.test/company-c",
+        ],
+    }
+    final, _ = _resume(
+        request_file=request7_file,
+        response_file=tmp_path / "agent2script-7.json",
+        result=analysis3,
         cwd=tmp_path,
         env=env,
     )
@@ -329,6 +376,9 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
     assert report["analysis"]["confidence"] == 72
     assert report["analysis"]["market_evidence"]
     assert report["analysis"]["news_evidence_urls"]
+    assert report["analysis_strategy"]["analysis_instruction"].startswith(
+        "Cite concrete market observations"
+    )
 
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "completed"
@@ -346,6 +396,10 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
         "agent",  # targeted research
         "agent",  # second four-track analysis
         "step",   # final analysis validation
+        "agent",  # GEPA reflection proposal
+        "agent",  # proposal analysis under the revised strategy
+        "step",   # proposal analysis validation
+        "step",   # deterministic proposal acceptance
         "step",   # final news evidence re-check
         "step",   # render report
     ]

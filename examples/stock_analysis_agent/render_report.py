@@ -18,6 +18,7 @@ def main() -> None:
     parser.add_argument("--features-json", required=True)
     parser.add_argument("--news-json", required=True)
     parser.add_argument("--analysis-json", required=True)
+    parser.add_argument("--analysis-strategy-json", required=True)
     parser.add_argument("--workdir", required=True)
     args = parser.parse_args()
 
@@ -25,6 +26,7 @@ def main() -> None:
     features = json.loads(args.features_json)
     news = json.loads(args.news_json)
     analysis = json.loads(args.analysis_json)
+    analysis_strategy = json.loads(args.analysis_strategy_json)
 
     workdir = Path(args.workdir).resolve()
     workdir.mkdir(parents=True, exist_ok=True)
@@ -35,6 +37,7 @@ def main() -> None:
         "market_features": features,
         "recent_news": news,
         "analysis": analysis,
+        "analysis_strategy": analysis_strategy,
         "disclaimer": "This workflow output is informational analysis, not personalized investment advice.",
     }
 
@@ -76,6 +79,10 @@ def main() -> None:
         [
             "",
             "## 分析",
+            "",
+            "### GEPA 分析策略",
+            "",
+            f"- analysis_instruction：{analysis_strategy['analysis_instruction']}",
             "",
             f"**短期倾向：{analysis['short_term_bias']}**",
             "",

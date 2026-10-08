@@ -15,9 +15,21 @@ from pathlib import Path
 from typing import Literal
 
 from looma import agent, step, workflow
+from looma.optimization import (
+    Candidate,
+    EvaluationBatch,
+    OptimizationState,
+    candidate_id,
+    select_candidate,
+)
+from looma.optimization.engine import request_reflection
+from looma.optimization.state import accept_proposal
 
 
 HERE = Path(__file__).resolve().parent
+DEFAULT_ANALYSIS_INSTRUCTION = (
+    "Analyze all four tracks and summarize the available evidence."
+)
 
 
 @dataclass
@@ -106,6 +118,104 @@ def news_to_dict(value: NewsResearch) -> dict:
 
 def market_research_to_dict(value: MarketDataResearch) -> dict:
     return asdict(value)
+
+
+def analysis_evaluation(
+    analysis: AnalysisRound,
+    validation: dict,
+) -> EvaluationBatch:
+    """Turn deterministic analysis validation into GEPA evaluation evidence."""
+
+    ready = validation["status"] == "ready"
+    return EvaluationBatch(
+        outputs=[asdict(analysis)],
+        scores=[1.0 if ready else 0.0],
+        side_information=[
+            {
+                "validation_status": validation["status"],
+                "problems": validation["problems"],
+            }
+        ],
+        metric_calls=1,
+    )
+
+
+def request_analysis(
+    *,
+    target: dict,
+    market: dict,
+    features: dict,
+    news: NewsResearch,
+    evidence_check: dict,
+    analysis_problems: list[str],
+    analysis_round: int,
+    strategy: Candidate,
+) -> AnalysisRound:
+    """Ask the current Host Agent for an analysis under one candidate strategy."""
+
+    return agent(
+        task=(
+            "基于 input 中已经给出的真实 K线、成交量、换手率、波动数据和最近新闻，"
+            "完成一次结构化短期股票分析。不要重新定义分析流程，也不要补造 input 中不存在的数据。"
+            "以下四个分析方向相互独立："
+            "(1) technical/K-line：趋势、均线、区间涨跌和异常交易日；"
+            "(2) volume/turnover：成交量、成交额相关变化、换手率和量价配合；"
+            "(3) news/event：最近新闻与价格行为是否存在时间和逻辑上的对应；"
+            "(4) risk/counter-evidence：寻找与主判断相反的证据和结论失效条件。"
+            "如果当前宿主支持 native subagent，请由宿主将这四个方向并发执行后 gather；"
+            "如果不支持则串行完成。Looma 不负责创建或调度 subagent。"
+            "不要通过 CLI、SDK、API 或 subprocess 启动另一个 Coding Agent。"
+            "market_evidence 必须列出本次判断实际引用的具体日期/数值观察；"
+            "news_evidence_urls 只能引用 input.recent_news 中真实存在的 URL。"
+            "主宿主 gather 后给出 bullish/neutral/bearish/mixed 的短期倾向、0-100 置信度、"
+            "综合结论和后续观察信号。"
+            "如果现有证据不足以形成可靠结论，将 needs_more_research=true，"
+            "并给出少量、明确、仅与当前短期判断相关的 research_queries。"
+            f"本轮分析策略 candidate.analysis_instruction：{strategy['analysis_instruction']}"
+        ),
+        input={
+            "target": target,
+            "market_source": {
+                "source": market.get("source"),
+                "source_urls": market.get("source_urls", []),
+            },
+            "market_rows": market["rows"],
+            "market_features": features,
+            "recent_news": news_to_dict(news),
+            "news_evidence_check": evidence_check,
+            "previous_validation_problems": analysis_problems,
+            "analysis_round": analysis_round,
+            "analysis_strategy": strategy,
+        },
+        output_schema=AnalysisRound,
+    )
+
+
+def request_targeted_research(
+    *,
+    target: dict,
+    research_queries: list[str],
+    analysis_validation_problems: list[str],
+    existing_news: NewsResearch,
+) -> NewsResearch:
+    """Ask the current Host Agent for evidence targeted by analysis feedback."""
+
+    return agent(
+        task=(
+            "执行 input.research_queries 指定的定向事实核查。"
+            "使用当前宿主原生 web/search/browser 能力，仍然优先近期和一手来源。"
+            "本步骤只补充与当前分析缺口直接相关的真实证据，不重新做完整股票分析。"
+            "返回的新闻证据仍必须落在 input.target 的 recent-news 时间窗口内；"
+            "如果某查询无法在该窗口内找到证据，应在 coverage_note 中明确说明，不能编造。"
+        ),
+        input={
+            "target": target,
+            "research_queries": research_queries,
+            "analysis_validation_problems": analysis_validation_problems,
+            "existing_news": news_to_dict(existing_news),
+        },
+        output_schema=NewsResearch,
+    )
 
 
 def merge_news(base: NewsResearch, supplement: NewsResearch) -> NewsResearch:
@@ -312,46 +422,34 @@ def analyze_stock(
 
     assert evidence_check is not None
 
-    # Stage 6: multi-angle semantic analysis. Looma describes independent work;
-    # actual subagent creation/concurrency belongs entirely to the current host.
+    # Stage 6: multi-angle semantic analysis plus a bounded GEPA-style strategy
+    # refinement loop. Looma describes independent work; actual subagent
+    # creation/concurrency belongs entirely to the current host.
+    analysis_state = OptimizationState.initialize(
+        {"analysis_instruction": DEFAULT_ANALYSIS_INSTRUCTION},
+        max_iterations=max(1, max_research_rounds + 1),
+        max_metric_calls=max(2, 2 * (max_research_rounds + 1)),
+        score_threshold=1.0,
+        no_improvement_patience=1,
+    )
     final_analysis = None
     analysis_ready = False
     analysis_problems: list[str] = []
 
     for analysis_round in range(max_research_rounds + 1):
-        final_analysis = agent(
-            task=(
-                "基于 input 中已经给出的真实 K线、成交量、换手率、波动数据和最近新闻，"
-                "完成一次结构化短期股票分析。不要重新定义分析流程，也不要补造 input 中不存在的数据。"
-                "以下四个分析方向相互独立："
-                "(1) technical/K-line：趋势、均线、区间涨跌和异常交易日；"
-                "(2) volume/turnover：成交量、成交额相关变化、换手率和量价配合；"
-                "(3) news/event：最近新闻与价格行为是否存在时间和逻辑上的对应；"
-                "(4) risk/counter-evidence：寻找与主判断相反的证据和结论失效条件。"
-                "如果当前宿主支持 native subagent，请由宿主将这四个方向并发执行后 gather；"
-                "如果不支持则串行完成。Looma 不负责创建或调度 subagent。"
-                "不要通过 CLI、SDK、API 或 subprocess 启动另一个 Coding Agent。"
-                "market_evidence 必须列出本次判断实际引用的具体日期/数值观察；"
-                "news_evidence_urls 只能引用 input.recent_news 中真实存在的 URL。"
-                "主宿主 gather 后给出 bullish/neutral/bearish/mixed 的短期倾向、0-100 置信度、"
-                "综合结论和后续观察信号。"
-                "如果现有证据不足以形成可靠结论，将 needs_more_research=true，"
-                "并给出少量、明确、仅与当前短期判断相关的 research_queries。"
-            ),
-            input={
-                "target": target,
-                "market_source": {
-                    "source": market.get("source"),
-                    "source_urls": market.get("source_urls", []),
-                },
-                "market_rows": market["rows"],
-                "market_features": features,
-                "recent_news": news_to_dict(news),
-                "news_evidence_check": evidence_check,
-                "previous_validation_problems": analysis_problems,
-                "analysis_round": analysis_round + 1,
-            },
-            output_schema=AnalysisRound,
+        if analysis_state.should_stop:
+            break
+
+        analysis_candidate = select_candidate(analysis_state)
+        final_analysis = request_analysis(
+            target=target,
+            market=market,
+            features=features,
+            news=news,
+            evidence_check=evidence_check,
+            analysis_problems=analysis_problems,
+            analysis_round=analysis_round + 1,
+            strategy=analysis_candidate,
         )
 
         analysis_validation = step(
@@ -375,23 +473,91 @@ def analyze_stock(
             break
 
         if final_analysis.needs_more_research:
-            supplement = agent(
-                task=(
-                    "执行 input.research_queries 指定的定向事实核查。"
-                    "使用当前宿主原生 web/search/browser 能力，仍然优先近期和一手来源。"
-                    "本步骤只补充与当前分析缺口直接相关的真实证据，不重新做完整股票分析。"
-                    "返回的新闻证据仍必须落在 input.target 的 recent-news 时间窗口内；"
-                    "如果某查询无法在该窗口内找到证据，应在 coverage_note 中明确说明，不能编造。"
-                ),
-                input={
-                    "target": target,
-                    "research_queries": final_analysis.research_queries,
-                    "analysis_validation_problems": analysis_problems,
-                    "existing_news": news_to_dict(news),
-                },
-                output_schema=NewsResearch,
+            supplement = request_targeted_research(
+                target=target,
+                research_queries=final_analysis.research_queries,
+                analysis_validation_problems=analysis_problems,
+                existing_news=news,
             )
             news = merge_news(news, supplement)
+            continue
+
+        parent_evaluation = analysis_evaluation(final_analysis, analysis_validation)
+        proposal = request_reflection(
+            task=(
+                "分析校验未通过。请根据 input.evaluation 中的 validation problems，"
+                "只改进 analysis_instruction 这个已声明组件，并返回一个候选 proposal。"
+                "不要修改数据来源、证据门槛、报告状态或其它工作流行为。"
+            ),
+            candidate=analysis_candidate,
+            evaluation=parent_evaluation,
+            components_to_update=["analysis_instruction"],
+            frontier_ids=analysis_state.frontier.ids,
+            metric_calls=parent_evaluation.metric_calls or 0,
+            remaining_budget=(
+                analysis_state.config.max_metric_calls
+                - analysis_state.metric_calls
+                - (parent_evaluation.metric_calls or 0)
+                if analysis_state.config.max_metric_calls is not None
+                else None
+            ),
+        )
+
+        proposal_analysis = request_analysis(
+            target=target,
+            market=market,
+            features=features,
+            news=news,
+            evidence_check=evidence_check,
+            analysis_problems=analysis_problems,
+            analysis_round=analysis_round + 1,
+            strategy=proposal.candidate,
+        )
+        proposal_validation = step(
+            run_json_script,
+            str(HERE / "validate_analysis.py"),
+            "--analysis-json",
+            json.dumps(asdict(proposal_analysis), ensure_ascii=False),
+            "--news-json",
+            json.dumps(news_to_dict(news), ensure_ascii=False),
+        )
+        proposal_evaluation = analysis_evaluation(
+            proposal_analysis,
+            proposal_validation,
+        )
+        accepted = step(
+            accept_proposal,
+            analysis_state,
+            proposal,
+            scores={"analysis_validation": proposal_evaluation.scores[0]},
+            parent_scores={"analysis_validation": parent_evaluation.scores[0]},
+            metric_calls=(
+                (parent_evaluation.metric_calls or 0)
+                + (proposal_evaluation.metric_calls or 0)
+            ),
+            parent_candidate_id=candidate_id(analysis_candidate),
+        )
+        final_analysis = proposal_analysis
+        analysis_validation = proposal_validation
+        analysis_problems = proposal_validation["problems"]
+
+        if not accepted["accepted"]:
+            break
+
+        analysis_state = OptimizationState.from_json(accepted["state"])
+        if proposal_analysis.needs_more_research:
+            supplement = request_targeted_research(
+                target=target,
+                research_queries=proposal_analysis.research_queries,
+                analysis_validation_problems=analysis_problems,
+                existing_news=news,
+            )
+            news = merge_news(news, supplement)
+            continue
+
+        if proposal_validation["status"] == "ready":
+            analysis_ready = True
+            break
 
     assert final_analysis is not None
 
@@ -428,6 +594,8 @@ def analyze_stock(
         json.dumps(news_to_dict(news), ensure_ascii=False),
         "--analysis-json",
         json.dumps(asdict(final_analysis), ensure_ascii=False),
+        "--analysis-strategy-json",
+        json.dumps(select_candidate(analysis_state), ensure_ascii=False),
         "--workdir",
         str(root),
     )
