@@ -31,6 +31,7 @@ class DeterministicAdapter:
             outputs=[{"score": score} for _ in batch],
             scores=[score for _ in batch],
             trajectories=[trace for _ in batch] if capture_traces else None,
+            instance_scores={item["id"]: {"quality": score} for item in batch},
             side_information=[trace for _ in batch],
             metric_calls=len(batch),
         )
@@ -53,7 +54,12 @@ class DeterministicAdapter:
 
 
 ADAPTER = DeterministicAdapter()
-DATASET = [{"question": "What evidence supports this answer?"}]
+DATASET = [
+    {
+        "id": "evidence-question-1",
+        "question": "What evidence supports this answer?",
+    }
+]
 
 
 @workflow
@@ -61,9 +67,14 @@ def main() -> None:
     state = OptimizationState.initialize(
         {"instruction": "Answer directly."},
         max_iterations=3,
+        max_metric_calls=10,
         score_threshold=1.0,
     )
     while not state.should_stop:
+        expected_calls = 2 * len(DATASET)
+        if not state.can_evaluate(metric_calls=expected_calls):
+            break
+
         parent = select_candidate(state)
         parent_id = candidate_id(parent)
         parent_evaluation = step(
@@ -96,6 +107,8 @@ def main() -> None:
             proposal,
             scores={"example": proposal_evaluation["scores"][0]},
             parent_scores={"example": parent_evaluation["scores"][0]},
+            instance_scores=proposal_evaluation["instance_scores"],
+            parent_instance_scores=parent_evaluation["instance_scores"],
             metric_calls=(
                 parent_evaluation["metric_calls"]
                 + proposal_evaluation["metric_calls"]

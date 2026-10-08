@@ -341,19 +341,73 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
 
     analysis3 = {
         **analysis2,
-        "market_evidence": [
-            "2026-09-14~2026-09-18 close increased from 231 to 252",
-            "2026-09-18 volume=350 and turnover_rate=9.1%",
-        ],
-        "news_evidence_urls": [
-            "https://example.test/news-b",
-            "https://example.test/company-c",
-        ],
+        "market_evidence": [],
     }
-    final, _ = _resume(
+    seventh, _ = _resume(
         request_file=request7_file,
         response_file=tmp_path / "agent2script-7.json",
         result=analysis3,
+        cwd=tmp_path,
+        env=env,
+    )
+    assert seventh.returncode == 75, seventh.stderr
+    request8_file = _latest_request(run_dir)
+    request8 = json.loads(request8_file.read_text(encoding="utf-8"))
+    assert "结构化短期股票分析" in request8["task"]
+    assert request8["output"]["agent_input"]["analysis_strategy"]["analysis_instruction"].startswith(
+        "Cite concrete market observations"
+    )
+
+    analysis3_retry = {**analysis2, "market_evidence": []}
+    eighth, _ = _resume(
+        request_file=request8_file,
+        response_file=tmp_path / "agent2script-8.json",
+        result=analysis3_retry,
+        cwd=tmp_path,
+        env=env,
+    )
+    assert eighth.returncode == 75, eighth.stderr
+    request9_file = _latest_request(run_dir)
+    request9 = json.loads(request9_file.read_text(encoding="utf-8"))
+    assert "分析校验" in request9["task"]
+    assert request9["output"]["agent_input"]["candidate"]["analysis_instruction"].startswith(
+        "Cite concrete market observations"
+    )
+
+    proposal2 = {
+        **proposal,
+        "candidate": {
+            "analysis_instruction": (
+                "Cite dated values from the market rows and explicitly state counter-evidence."
+            )
+        },
+        "hypothesis": "Dated source values should make the evidence verifiable.",
+    }
+    ninth, _ = _resume(
+        request_file=request9_file,
+        response_file=tmp_path / "agent2script-9.json",
+        result=proposal2,
+        cwd=tmp_path,
+        env=env,
+    )
+    assert ninth.returncode == 75, ninth.stderr
+    request10_file = _latest_request(run_dir)
+    request10 = json.loads(request10_file.read_text(encoding="utf-8"))
+    assert request10["output"]["agent_input"]["analysis_strategy"][
+        "analysis_instruction"
+    ].startswith("Cite dated values")
+
+    analysis4 = {
+        **analysis2,
+        "market_evidence": [
+            "2026-09-14~2026-09-18 close increased from 231 to 252",
+            "2026-09-18 volume=350 and turnover_rate_pct=9.1%",
+        ],
+    }
+    final, _ = _resume(
+        request_file=request10_file,
+        response_file=tmp_path / "agent2script-10.json",
+        result=analysis4,
         cwd=tmp_path,
         env=env,
     )
@@ -377,7 +431,7 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
     assert report["analysis"]["market_evidence"]
     assert report["analysis"]["news_evidence_urls"]
     assert report["analysis_strategy"]["analysis_instruction"].startswith(
-        "Cite concrete market observations"
+        "Cite dated values"
     )
 
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
@@ -400,6 +454,12 @@ def test_stock_analysis_agent_host_fallback_and_research_loop(tmp_path: Path):
         "agent",  # proposal analysis under the revised strategy
         "step",   # proposal analysis validation
         "step",   # deterministic proposal acceptance
+        "agent",  # re-evaluate the accepted strategy
+        "step",   # re-evaluated analysis validation
+        "agent",  # second GEPA reflection proposal
+        "agent",  # second proposal analysis
+        "step",   # second proposal analysis validation
+        "step",   # second deterministic proposal acceptance
         "step",   # final news evidence re-check
         "step",   # render report
     ]

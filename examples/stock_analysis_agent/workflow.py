@@ -126,10 +126,11 @@ def analysis_evaluation(
 ) -> EvaluationBatch:
     """Turn deterministic analysis validation into GEPA evaluation evidence."""
 
-    ready = validation["status"] == "ready"
+    objective_scores = validation["scores"]
     return EvaluationBatch(
         outputs=[asdict(analysis)],
-        scores=[1.0 if ready else 0.0],
+        scores=[sum(objective_scores.values()) / len(objective_scores)],
+        objective_scores=[objective_scores],
         side_information=[
             {
                 "validation_status": validation["status"],
@@ -251,6 +252,7 @@ def analyze_stock(
     news_days: int,
     market_days: int,
     max_research_rounds: int,
+    max_optimization_rounds: int,
     market_fixture: str | None,
     force_market_fallback: bool,
 ):
@@ -427,19 +429,21 @@ def analyze_stock(
     # creation/concurrency belongs entirely to the current host.
     analysis_state = OptimizationState.initialize(
         {"analysis_instruction": DEFAULT_ANALYSIS_INSTRUCTION},
-        max_iterations=max(1, max_research_rounds + 1),
-        max_metric_calls=max(2, 2 * (max_research_rounds + 1)),
+        max_iterations=max_optimization_rounds,
+        max_metric_calls=2 * max_optimization_rounds,
         score_threshold=1.0,
-        no_improvement_patience=1,
+        no_improvement_patience=max_optimization_rounds,
     )
     final_analysis = None
     analysis_ready = False
     analysis_problems: list[str] = []
 
-    for analysis_round in range(max_research_rounds + 1):
-        if analysis_state.should_stop:
+    analysis_round = 0
+    research_rounds = 0
+    while not analysis_state.should_stop:
+        if not analysis_state.can_evaluate(metric_calls=1):
             break
-
+        analysis_round += 1
         analysis_candidate = select_candidate(analysis_state)
         final_analysis = request_analysis(
             target=target,
@@ -448,7 +452,7 @@ def analyze_stock(
             news=news,
             evidence_check=evidence_check,
             analysis_problems=analysis_problems,
-            analysis_round=analysis_round + 1,
+            analysis_round=analysis_round,
             strategy=analysis_candidate,
         )
 
@@ -457,6 +461,8 @@ def analyze_stock(
             str(HERE / "validate_analysis.py"),
             "--analysis-json",
             json.dumps(asdict(final_analysis), ensure_ascii=False),
+            "--market-json",
+            json.dumps(market, ensure_ascii=False),
             "--news-json",
             json.dumps(news_to_dict(news), ensure_ascii=False),
         )
@@ -469,10 +475,10 @@ def analyze_stock(
             analysis_ready = True
             break
 
-        if analysis_round >= max_research_rounds:
-            break
-
         if final_analysis.needs_more_research:
+            if research_rounds >= max_research_rounds:
+                break
+            research_rounds += 1
             supplement = request_targeted_research(
                 target=target,
                 research_queries=final_analysis.research_queries,
@@ -482,7 +488,23 @@ def analyze_stock(
             news = merge_news(news, supplement)
             continue
 
+        if analysis_state.iteration >= analysis_state.config.max_iterations:
+            break
+
         parent_evaluation = analysis_evaluation(final_analysis, analysis_validation)
+        if not analysis_state.can_evaluate(
+            metric_calls=1,
+            pending_metric_calls=parent_evaluation.metric_calls or 0,
+        ):
+            break
+        remaining_after_parent = (
+            analysis_state.config.max_metric_calls
+            - analysis_state.metric_calls
+            - (parent_evaluation.metric_calls or 0)
+        )
+        if remaining_after_parent < 1:
+            break
+
         proposal = request_reflection(
             task=(
                 "分析校验未通过。请根据 input.evaluation 中的 validation problems，"
@@ -494,13 +516,7 @@ def analyze_stock(
             components_to_update=["analysis_instruction"],
             frontier_ids=analysis_state.frontier.ids,
             metric_calls=parent_evaluation.metric_calls or 0,
-            remaining_budget=(
-                analysis_state.config.max_metric_calls
-                - analysis_state.metric_calls
-                - (parent_evaluation.metric_calls or 0)
-                if analysis_state.config.max_metric_calls is not None
-                else None
-            ),
+            remaining_budget=remaining_after_parent,
         )
 
         proposal_analysis = request_analysis(
@@ -518,6 +534,8 @@ def analyze_stock(
             str(HERE / "validate_analysis.py"),
             "--analysis-json",
             json.dumps(asdict(proposal_analysis), ensure_ascii=False),
+            "--market-json",
+            json.dumps(market, ensure_ascii=False),
             "--news-json",
             json.dumps(news_to_dict(news), ensure_ascii=False),
         )
@@ -529,23 +547,30 @@ def analyze_stock(
             accept_proposal,
             analysis_state,
             proposal,
-            scores={"analysis_validation": proposal_evaluation.scores[0]},
-            parent_scores={"analysis_validation": parent_evaluation.scores[0]},
+            scores=proposal_evaluation.objective_scores[0],
+            parent_scores=parent_evaluation.objective_scores[0],
+            hard_constraints={
+                "analysis_instruction_is_nonempty": bool(
+                    proposal.candidate.get("analysis_instruction", "").strip()
+                ),
+            },
             metric_calls=(
                 (parent_evaluation.metric_calls or 0)
                 + (proposal_evaluation.metric_calls or 0)
             ),
             parent_candidate_id=candidate_id(analysis_candidate),
         )
-        final_analysis = proposal_analysis
-        analysis_validation = proposal_validation
-        analysis_problems = proposal_validation["problems"]
-
         if not accepted["accepted"]:
             break
 
+        final_analysis = proposal_analysis
+        analysis_validation = proposal_validation
+        analysis_problems = proposal_validation["problems"]
         analysis_state = OptimizationState.from_json(accepted["state"])
         if proposal_analysis.needs_more_research:
+            if research_rounds >= max_research_rounds:
+                break
+            research_rounds += 1
             supplement = request_targeted_research(
                 target=target,
                 research_queries=proposal_analysis.research_queries,
@@ -610,9 +635,12 @@ def main() -> None:
     parser.add_argument("--news-days", type=int, default=3)
     parser.add_argument("--market-days", type=int, default=20)
     parser.add_argument("--max-research-rounds", type=int, default=2)
+    parser.add_argument("--max-optimization-rounds", type=int, default=3)
     parser.add_argument("--market-fixture", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--force-market-fallback", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.max_optimization_rounds < 1:
+        parser.error("--max-optimization-rounds must be positive")
 
     from datetime import date
 
@@ -624,6 +652,7 @@ def main() -> None:
         news_days=args.news_days,
         market_days=args.market_days,
         max_research_rounds=args.max_research_rounds,
+        max_optimization_rounds=args.max_optimization_rounds,
         market_fixture=args.market_fixture,
         force_market_fallback=args.force_market_fallback,
     )

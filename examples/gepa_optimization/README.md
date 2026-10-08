@@ -2,14 +2,14 @@
 
 This example keeps Looma's Agent-Embedded Programming model intact while adding a small GEPA-style loop:
 
-1. Python owns the candidate, evaluation, acceptance rule, and frontier state.
+1. Python owns the candidate, evaluation, acceptance rule, and frontier state. Evaluators can attach stable per-instance scores so candidates that win on different examples remain available for later mutation.
 2. `step()` evaluates the candidate durably.
 3. `request_reflection()` hands traces and actionable side information to the current Host Agent through `agent()`.
 4. The Host Agent writes a structured `CandidateProposal` result and returns the exact `agent2script` command.
 5. A second durable `step()` evaluates the proposed candidate.
 6. `step(accept_proposal, ...)` applies deterministic gates and records the accepted candidate.
 
-The evaluator is deterministic and local. The example does not import the external `gepa` package, call a model API, launch another Agent, or require network access.
+The evaluator is deterministic and local. The example does not import the external `gepa` package, call a model API, launch another Agent, or require network access. Its per-instance frontier is intentionally small: winners are tracked per instance/objective and selected in a deterministic cycle weighted by how many keys each candidate wins. `max_metric_calls` is checked before the parent/proposal evaluation pair and again during acceptance.
 
 Run it from the repository root:
 

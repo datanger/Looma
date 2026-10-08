@@ -65,6 +65,7 @@ def main():
         proposal,
         scores={"case": proposal_evaluation["scores"][0]},
         parent_scores={"case": evaluation["scores"][0]},
+        hard_constraints={"prompt_is_nonempty": bool(proposal.candidate["prompt"])},
         metric_calls=evaluation["metric_calls"] + proposal_evaluation["metric_calls"],
         parent_candidate_id=candidate_id(state.seed_candidate),
     )

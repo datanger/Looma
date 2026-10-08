@@ -26,3 +26,28 @@ def test_candidate_id_rejects_non_string_values():
 def test_evaluation_batch_requires_aligned_values():
     with pytest.raises(ValueError, match="same length"):
         EvaluationBatch(outputs=["ok"], scores=[])
+
+
+def test_evaluation_batch_serializes_stable_instance_scores():
+    evaluation = EvaluationBatch(
+        outputs=["ok", "bad"],
+        scores=[1.0, 0.0],
+        instance_scores={
+            "case-1": {"quality": 1.0},
+            "case-2": {"quality": 0.0},
+        },
+    )
+
+    assert evaluation.to_json()["instance_scores"] == {
+        "case-1": {"quality": 1.0},
+        "case-2": {"quality": 0.0},
+    }
+
+
+def test_evaluation_batch_rejects_empty_instance_ids():
+    with pytest.raises(ValueError, match="non-empty"):
+        EvaluationBatch(
+            outputs=["ok"],
+            scores=[1.0],
+            instance_scores={"": {"quality": 1.0}},
+        )

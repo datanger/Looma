@@ -129,6 +129,7 @@ Python Pareto frontier + durable state
 Looma 的 `looma.optimization` 是一个可选的通用协议层，不是第四个执行原语，也不是外部 GEPA 包的隐藏封装。candidate 是 `dict[str, str]`，可以表示 prompt、skill instruction、policy、configuration 或 code artifact。`EvaluationBatch` 可以携带：
 
 - 每个样本的输出和 higher-is-better score；
+- 可选的稳定 instance ID 与逐样本 objective scores，用于保留不同样本上的互补候选；
 - 可选 objective score 映射；
 - 可选 trajectory；
 - 可选 ASI（Actionable Side Information），例如失败、约束违反、性能数据、工具轨迹和 evaluator feedback。
@@ -139,6 +140,8 @@ Looma 的 `looma.optimization` 是一个可选的通用协议层，不是第四�
 - 当前 Host Agent 通过 `agent()` 阅读 score、trajectory 和 ASI，返回结构化 `CandidateProposal`；
 - Python 用 deterministic acceptance gate 检查组件范围、硬约束、回归规则、分数门槛和预算；
 - `Pareto frontier` 保留在不同实例或目标上互补的候选，并用稳定 candidate identity 和确定性排序；
+- 提供逐样本分数时，候选按其胜出的 instance/objective key 进入 frontier，父候选按胜出 key 频次进行可复现选择；只提供汇总分数时继续使用兼容的 objective-vector frontier；
+- `max_metric_calls` 可在 evaluator 执行前做预算预检，并由 acceptance gate 再次检查实际调用数；
 - Looma 只负责这次交接的 suspend、state、replay 和 resume，不创建新的模型客户端、Agent、subagent 或隐藏 retry engine。
 
 一个最小循环如下：

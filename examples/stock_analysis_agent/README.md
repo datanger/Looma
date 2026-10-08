@@ -43,7 +43,8 @@ deterministic analysis validation
       │                              ↓
       │                    proposal analysis + acceptance gate
       │                              │
-      │                    revised strategy ─→ loop
+      │                    revised strategy ─→ re-evaluate
+      │                              └─ still invalid → reflect again (bounded)
       │
       └─ ready ────────────────→
              ↓
@@ -63,6 +64,16 @@ candidate, and the same analysis is replayed under that candidate. Python
 accepts the proposal with `accept_proposal()` and only the accepted strategy is
 recorded in the final report. Evidence acquisition, report status, and the
 final news gate remain program-owned.
+
+The evaluator reports four independently inspectable objectives: analysis
+track coverage, market-evidence grounding against dated source rows, precision
+of recent-news URL citations, and required-section coverage. Invalid outputs
+remain eligible for further reflection rather than being mistaken for a
+successful report. `--max-optimization-rounds` (default `3`) bounds accepted
+strategy changes; each acceptance accounts for one parent and one proposal
+evaluation against the metric-call budget. If the budget or round limit is
+reached without passing the deterministic gate, the report is written as
+`insufficient_evidence`.
 
 ## Data
 
@@ -111,6 +122,7 @@ Useful options:
 --news-days 3       recent calendar-day news window
 --market-days 20    recent trading rows used for market analysis
 --max-research-rounds 2
+--max-optimization-rounds 3
 --as-of YYYY-MM-DD  make the analysis reproducible
 ```
 

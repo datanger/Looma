@@ -43,6 +43,7 @@ class EvaluationBatch:
     objective_scores: list[dict[str, float]] | None = None
     side_information: list[Any] | None = None
     metric_calls: int | None = None
+    instance_scores: dict[str, dict[str, float]] | None = None
 
     def __post_init__(self) -> None:
         size = len(self.outputs)
@@ -54,6 +55,17 @@ class EvaluationBatch:
             if values is not None and len(values) != size:
                 raise ValueError(f"outputs and {name} must have the same length")
 
+        if self.instance_scores is not None:
+            if any(
+                not isinstance(instance_id, str) or not instance_id
+                for instance_id in self.instance_scores
+            ):
+                raise ValueError("instance score IDs must be non-empty strings")
+            if not self.instance_scores:
+                raise ValueError("instance scores must not be empty")
+            if any(not scores for scores in self.instance_scores.values()):
+                raise ValueError("each instance must have at least one objective score")
+
         if self.metric_calls is not None and self.metric_calls < 0:
             raise ValueError("metric_calls must be non-negative")
 
@@ -64,6 +76,7 @@ class EvaluationBatch:
                 "scores": self.scores,
                 "trajectories": self.trajectories,
                 "objective_scores": self.objective_scores,
+                "instance_scores": self.instance_scores,
                 "side_information": self.side_information,
                 "metric_calls": self.metric_calls,
             }

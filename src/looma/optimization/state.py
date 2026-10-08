@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any
 
 from ..serde import normalize_json
@@ -19,12 +20,30 @@ class OptimizationConfig:
     no_improvement_patience: int | None = None
 
     def __post_init__(self) -> None:
-        if self.max_iterations < 1:
+        if (
+            isinstance(self.max_iterations, bool)
+            or not isinstance(self.max_iterations, int)
+            or self.max_iterations < 1
+        ):
             raise ValueError("max_iterations must be positive")
-        if self.max_metric_calls is not None and self.max_metric_calls < 0:
+        if self.max_metric_calls is not None and (
+            isinstance(self.max_metric_calls, bool)
+            or not isinstance(self.max_metric_calls, int)
+            or self.max_metric_calls < 0
+        ):
             raise ValueError("max_metric_calls must be non-negative")
-        if self.no_improvement_patience is not None and self.no_improvement_patience < 1:
+        if self.no_improvement_patience is not None and (
+            isinstance(self.no_improvement_patience, bool)
+            or not isinstance(self.no_improvement_patience, int)
+            or self.no_improvement_patience < 1
+        ):
             raise ValueError("no_improvement_patience must be positive")
+        if self.score_threshold is not None and (
+            isinstance(self.score_threshold, bool)
+            or not isinstance(self.score_threshold, (int, float))
+            or not isfinite(self.score_threshold)
+        ):
+            raise ValueError("score_threshold must be a finite number")
 
 
 @dataclass(frozen=True)
@@ -92,6 +111,27 @@ class OptimizationState:
             return True
         return False
 
+    def can_evaluate(
+        self,
+        *,
+        metric_calls: int,
+        pending_metric_calls: int = 0,
+    ) -> bool:
+        """Check budget before starting work, accounting for unevaluated work."""
+
+        for name, value in (
+            ("metric_calls", metric_calls),
+            ("pending_metric_calls", pending_metric_calls),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if self.config.max_metric_calls is None:
+            return True
+        return (
+            self.metric_calls + pending_metric_calls + metric_calls
+            <= self.config.max_metric_calls
+        )
+
     @property
     def frontier_summary(self) -> dict[str, Any]:
         return normalize_json(
@@ -119,6 +159,9 @@ class OptimizationState:
                 "frontier": {
                     "scores": self.frontier.scores,
                     "ids": self.frontier.ids,
+                    "instance_scores": self.frontier.instance_scores,
+                    "instance_best_scores": self.frontier.instance_best_scores,
+                    "instance_winners": self.frontier.instance_winners,
                 },
                 "iteration": self.iteration,
                 "metric_calls": self.metric_calls,
@@ -142,6 +185,36 @@ class OptimizationState:
                 for candidate, scores in frontier_value["scores"].items()
             },
             ids=tuple(str(candidate) for candidate in frontier_value["ids"]),
+            instance_scores={
+                str(candidate): {
+                    str(instance_id): {
+                        str(name): float(score)
+                        for name, score in objectives.items()
+                    }
+                    for instance_id, objectives in by_instance.items()
+                }
+                for candidate, by_instance in frontier_value.get(
+                    "instance_scores", {}
+                ).items()
+            },
+            instance_best_scores={
+                str(instance_id): {
+                    str(name): float(score)
+                    for name, score in objectives.items()
+                }
+                for instance_id, objectives in frontier_value.get(
+                    "instance_best_scores", {}
+                ).items()
+            },
+            instance_winners={
+                str(instance_id): {
+                    str(name): tuple(str(cid) for cid in candidate_ids)
+                    for name, candidate_ids in objectives.items()
+                }
+                for instance_id, objectives in frontier_value.get(
+                    "instance_winners", {}
+                ).items()
+            },
         )
         return cls(
             seed_candidate={str(k): str(v) for k, v in value["seed_candidate"].items()},
@@ -186,9 +259,25 @@ def _normalize_scores(scores: Mapping[str, float]) -> dict[str, float]:
         if isinstance(score, bool):
             raise ValueError("scores must be numbers")
         try:
-            normalized[name] = float(score)
+            numeric_score = float(score)
         except (TypeError, ValueError) as exc:
             raise ValueError("scores must be numbers") from exc
+        if not isfinite(numeric_score):
+            raise ValueError("scores must be finite numbers")
+        normalized[name] = numeric_score
+    return normalized
+
+
+def _normalize_instance_scores(
+    scores: Mapping[str, Mapping[str, float]],
+) -> dict[str, dict[str, float]]:
+    if not isinstance(scores, Mapping) or not scores:
+        raise ValueError("instance_scores must map stable IDs to objective scores")
+    normalized = {}
+    for instance_id, objectives in scores.items():
+        if not isinstance(instance_id, str) or not instance_id:
+            raise ValueError("instance score IDs must be non-empty strings")
+        normalized[instance_id] = _normalize_scores(objectives)
     return normalized
 
 
@@ -198,7 +287,9 @@ def accept_proposal(
     *,
     scores: Mapping[str, float],
     parent_scores: Mapping[str, float],
-    hard_constraints: Sequence[Callable[[Candidate], bool]] = (),
+    instance_scores: Mapping[str, Mapping[str, float]] | None = None,
+    parent_instance_scores: Mapping[str, Mapping[str, float]] | None = None,
+    hard_constraints: Mapping[str, bool] | None = None,
     metric_calls: int = 0,
     parent_candidate_id: str | None = None,
 ) -> AcceptanceResult:
@@ -206,13 +297,32 @@ def accept_proposal(
 
     if state.should_stop:
         return _reject(state, "optimization budget or stop condition is exhausted")
-    if metric_calls < 0:
+    if (
+        isinstance(metric_calls, bool)
+        or not isinstance(metric_calls, int)
+        or metric_calls < 0
+    ):
         return _reject(state, "metric_calls must be non-negative")
+    if (
+        state.config.max_metric_calls is not None
+        and state.metric_calls + metric_calls > state.config.max_metric_calls
+    ):
+        return _reject(state, "metric-call budget would be exceeded")
 
     try:
         proposed_id = candidate_id(proposal.candidate)
         normalized_scores = _normalize_scores(scores)
         normalized_parent_scores = _normalize_scores(parent_scores)
+        normalized_instance_scores = (
+            _normalize_instance_scores(instance_scores)
+            if instance_scores is not None
+            else None
+        )
+        normalized_parent_instance_scores = (
+            _normalize_instance_scores(parent_instance_scores)
+            if parent_instance_scores is not None
+            else None
+        )
     except ValueError as exc:
         return _reject(state, str(exc))
     except Exception as exc:
@@ -225,30 +335,88 @@ def accept_proposal(
         return _reject(state, "proposal candidate must preserve the configured components")
     if set(normalized_scores) != set(normalized_parent_scores):
         return _reject(state, "candidate and parent must use the same score dimensions")
-    parent_id = parent_candidate_id or state.current_candidate_id or candidate_id(state.seed_candidate)
+    if (normalized_instance_scores is None) != (
+        normalized_parent_instance_scores is None
+    ):
+        return _reject(state, "candidate and parent must both provide instance scores")
+    if normalized_instance_scores is not None:
+        if set(normalized_instance_scores) != set(normalized_parent_instance_scores):
+            return _reject(state, "candidate and parent must score the same instances")
+        if any(
+            set(normalized_instance_scores[instance_id])
+            != set(normalized_parent_instance_scores[instance_id])
+            for instance_id in normalized_instance_scores
+        ):
+            return _reject(state, "candidate and parent must use the same instance objectives")
+    parent_id = (
+        parent_candidate_id
+        or state.current_candidate_id
+        or candidate_id(state.seed_candidate)
+    )
     if parent_candidate_id is not None and parent_id not in state.candidates:
         return _reject(state, "parent candidate is not registered")
-    if state.current_scores is not None and parent_id == state.current_candidate_id and normalized_parent_scores != state.current_scores:
+    if parent_id not in state.candidates:
+        return _reject(state, "parent candidate is not registered")
+    if (
+        state.current_scores is not None
+        and parent_id == state.current_candidate_id
+        and normalized_parent_scores != state.current_scores
+    ):
         return _reject(state, "parent scores do not match the current optimization state")
     if proposed_id in state.candidates:
         return _reject(state, "candidate has already been evaluated")
 
-    try:
-        for constraint in hard_constraints:
-            if not constraint(proposal.candidate):
-                return _reject(state, "proposal failed a hard constraint")
-    except Exception as exc:
-        return _reject(state, f"hard constraint failed: {exc}")
+    changed_components = {
+        component
+        for component, value in proposal.candidate.items()
+        if value != state.candidates[parent_id][component]
+    }
+    undeclared_changes = changed_components - set(proposal.components_to_update)
+    if undeclared_changes:
+        return _reject(
+            state,
+            "proposal changed undeclared components: "
+            + ", ".join(sorted(undeclared_changes)),
+        )
+
+    if hard_constraints is not None and not isinstance(hard_constraints, Mapping):
+        return _reject(state, "hard_constraints must map names to boolean results")
+    for name, passed in (hard_constraints or {}).items():
+        if not isinstance(name, str) or not isinstance(passed, bool):
+            return _reject(
+                state,
+                "hard_constraints must map string names to boolean results",
+            )
+        if not passed:
+            return _reject(state, f"proposal failed hard constraint: {name}")
 
     frontier = state.frontier
-    if not frontier.scores:
-        frontier = frontier.add(parent_id, normalized_parent_scores)
-    elif parent_id not in frontier.scores:
-        return _reject(state, "parent candidate is not present in the frontier")
+    if normalized_instance_scores is not None:
+        if frontier.scores and not frontier.instance_best_scores:
+            return _reject(state, "cannot add instance scores to an objective-only frontier")
+        frontier = frontier.add(
+            parent_id,
+            normalized_parent_scores,
+            instance_scores=normalized_parent_instance_scores,
+        )
+        next_frontier = frontier.add(
+            proposed_id,
+            normalized_scores,
+            instance_scores=normalized_instance_scores,
+        )
+        if proposed_id not in next_frontier.ids:
+            return _reject(state, "candidate wins no instance-level Pareto objective")
+    else:
+        if frontier.instance_best_scores:
+            return _reject(state, "instance scores are required by this frontier")
+        if not frontier.scores:
+            frontier = frontier.add(parent_id, normalized_parent_scores)
+        elif parent_id not in frontier.scores:
+            return _reject(state, "parent candidate is not present in the frontier")
 
-    next_frontier = frontier.add(proposed_id, normalized_scores)
-    if proposed_id not in next_frontier.scores:
-        return _reject(state, "candidate is dominated by the current frontier")
+        next_frontier = frontier.add(proposed_id, normalized_scores)
+        if proposed_id not in next_frontier.scores:
+            return _reject(state, "candidate is dominated by the current frontier")
 
     next_candidates = {
         candidate: dict(value) for candidate, value in state.candidates.items()
@@ -258,6 +426,13 @@ def accept_proposal(
         normalized_scores[name] > normalized_parent_scores[name]
         for name in normalized_scores
     )
+    if normalized_instance_scores is not None:
+        improved = improved or any(
+            proposal_values[objective]
+            > normalized_parent_instance_scores[instance_id][objective]
+            for instance_id, proposal_values in normalized_instance_scores.items()
+            for objective in proposal_values
+        )
     next_state = OptimizationState(
         seed_candidate=dict(state.seed_candidate),
         candidates=next_candidates,
@@ -310,7 +485,18 @@ def initialize(
     )
 
 
-def select_candidate(state: OptimizationState) -> Candidate:
+def select_candidate(
+    state: OptimizationState,
+    *,
+    weights: Mapping[str, float] | None = None,
+) -> Candidate:
     """Return the deterministically selected frontier candidate or the seed."""
 
-    return dict(state.best_candidate)
+    if not state.frontier.ids:
+        return dict(state.seed_candidate)
+    selected_id = select_candidate_id(
+        state.frontier,
+        weights=weights,
+        selection_index=state.iteration,
+    )
+    return dict(state.candidates[selected_id])
