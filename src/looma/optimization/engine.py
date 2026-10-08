@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from ..api import agent
 from ..serde import normalize_json
 from .protocol import Candidate, CandidateProposal, EvaluationBatch
+from .schema import reflection_input_schema
 
 
 def build_reflection_input(
@@ -56,4 +57,9 @@ def request_reflection(
         metric_calls=metric_calls,
         remaining_budget=remaining_budget,
     )
-    return agent(task=task, input=payload, output_schema=CandidateProposal)
+    return agent(
+        task=task,
+        input=payload,
+        input_schema=reflection_input_schema(),
+        output_schema=CandidateProposal,
+    )
