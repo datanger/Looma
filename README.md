@@ -94,7 +94,7 @@ Looma 还提供一个可选的 `looma.optimization` 辅助层，用于在 AEP Wo
 ## Install
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v0.1.4/looma_runtime-0.1.4-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v1.0/looma_runtime-1.0-py3-none-any.whl
 ```
 
 验证安装：
@@ -180,10 +180,11 @@ try AKShare 获取真实行情
 - [AGENTS.md](AGENTS.md) — Codex 标准仓库指令；Runtime、Host Contract、Replay、Result/Resume Contract、状态与开发约束
 - [docs/agent-embedded-programming.md](docs/agent-embedded-programming.md) — AEP 编程范式
 - [docs/design.md](docs/design.md) — Looma Runtime 设计
+- [docs/Looma-AEP-介绍材料.html](docs/Looma-AEP-介绍材料.html) — 可独立打开的 AEP 与 GEPA 图文介绍
 
 ## Status
 
-最新发布版本：**v0.1.4 / experimental**。当前开发分支还包含尚未发布的 `input_schema` Agent Input Contract 与可选 AEP + GEPA-style optimization capability。
+最新发布版本：**v1.0**。Looma 提供可恢复的 AEP Runtime，并包含可选的 GEPA 风格反思优化能力。公共编程接口为 `@workflow`、`step()` 和 `agent()`。
 
 CI 覆盖 Python 3.10、3.11、3.12、3.13，并验证 process restart、loop、多 Agent、多脚本、result schema guard、resume guard、run isolation 与 wheel 安装。
 

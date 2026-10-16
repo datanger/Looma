@@ -1,9 +1,27 @@
-# Next / unreleased
+# Looma v1.0
 
-- Added an optional `looma.optimization` layer for AEP-centered GEPA-style reflective optimization.
-- Added serializable candidate/evaluation/proposal contracts, deterministic Pareto tracking, acceptance gates, budgets, and Host-native reflection through the existing `agent()` boundary.
-- Added restart/replay/isolation coverage and a local deterministic `examples/gepa_optimization/` example.
-- Kept the base wheel pure Python with no external GEPA package, LLM SDK, or Agent launcher dependency.
+Looma 1.0 establishes the public AEP programming model and adds an optional GEPA-style optimization layer.
+
+## Highlights
+
+- Durable `@workflow`, `step()`, and `agent()` execution with replay, guarded handoff, and structured input/result validation.
+- Optional `looma.optimization` contracts for candidate/evaluation/proposal data, deterministic Pareto tracking, acceptance gates, budgets, and Host-native reflection through `agent()`.
+- Integrated stock-analysis and GEPA optimization examples, with process restart, replay, and isolation coverage.
+- Pure-Python package; no external GEPA dependency, LLM SDK, or Agent launcher.
+
+## Release integrity
+
+- `pyproject.toml`, `release/VERSION`, and `looma.__version__` are all `1.0`.
+- CI verifies the installed wheel, CLI, package metadata, and bundled AEP Skill.
+- CI covers Python 3.10, 3.11, 3.12, and 3.13.
+
+## Install
+
+```bash
+pip install https://github.com/datanger/Looma/releases/download/v1.0/looma_runtime-1.0-py3-none-any.whl
+```
+
+## Previous release
 
 # Looma v0.1.4
 

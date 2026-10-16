@@ -24,4 +24,4 @@ __all__ = [
     "validate_agent2script",
 ]
 
-__version__ = "0.1.4"
+__version__ = "1.0"

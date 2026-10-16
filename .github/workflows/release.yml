@@ -61,7 +61,9 @@ jobs:
       - run: python -m pip install --upgrade pip build pytest
       - run: python -m pip install -e .
       - run: pytest
-      - run: python -m build --wheel
+      - run: python -m build
+      - name: Verify wheel and source archive were built
+        run: python -c 'from pathlib import Path; p=list(Path("dist").glob("*.whl")); s=list(Path("dist").glob("*.tar.gz")); assert len(p)==1 and len(s)==1, (p, s)'
 
       - name: Verify built wheel before release
         shell: bash
@@ -94,4 +96,4 @@ jobs:
           name: Looma v${{ steps.version.outputs.version }}
           target_commitish: ${{ github.sha }}
           body_path: release/RELEASE_NOTES.md
-          files: dist/*.whl
+          files: dist/*
