@@ -94,7 +94,7 @@ Looma 还提供一个可选的 `looma.optimization` 辅助层，用于在 AEP Wo
 ## Install
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v1.0/looma_runtime-1.0-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v1.0.0/looma_runtime-1.0.0-py3-none-any.whl
 ```
 
 验证安装：
@@ -184,7 +184,7 @@ try AKShare 获取真实行情
 
 ## Status
 
-最新发布版本：**v1.0**。Looma 提供可恢复的 AEP Runtime，并包含可选的 GEPA 风格反思优化能力。公共编程接口为 `@workflow`、`step()` 和 `agent()`。
+最新发布版本：**v1.0.0**。Looma 提供可恢复的 AEP Runtime，并包含可选的 GEPA 风格反思优化能力。公共编程接口为 `@workflow`、`step()` 和 `agent()`。
 
 CI 覆盖 Python 3.10、3.11、3.12、3.13，并验证 process restart、loop、多 Agent、多脚本、result schema guard、resume guard、run isolation 与 wheel 安装。
 

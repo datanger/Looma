@@ -1,6 +1,6 @@
-# Looma v1.0
+# Looma v1.0.0
 
-Looma 1.0 establishes the public AEP programming model and adds an optional GEPA-style optimization layer.
+Looma 1.0.0 establishes the public AEP programming model and adds an optional GEPA-style optimization layer.
 
 ## Highlights
 
@@ -11,14 +11,14 @@ Looma 1.0 establishes the public AEP programming model and adds an optional GEPA
 
 ## Release integrity
 
-- `pyproject.toml`, `release/VERSION`, and `looma.__version__` are all `1.0`.
+- `pyproject.toml`, `release/VERSION`, and `looma.__version__` are all `1.0.0`.
 - CI verifies the installed wheel, CLI, package metadata, and bundled AEP Skill.
 - CI covers Python 3.10, 3.11, 3.12, and 3.13.
 
 ## Install
 
 ```bash
-pip install https://github.com/datanger/Looma/releases/download/v1.0/looma_runtime-1.0-py3-none-any.whl
+pip install https://github.com/datanger/Looma/releases/download/v1.0.0/looma_runtime-1.0.0-py3-none-any.whl
 ```
 
 ## Previous release
